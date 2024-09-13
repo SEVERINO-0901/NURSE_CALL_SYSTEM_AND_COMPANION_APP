@@ -1,5 +1,5 @@
 ## DADOS DO PROJETO
-- **Nome:** NurseCallSystem&CompanionApp; 
+- **Nome:** NurseCallSystem+CompanionApp; 
 - **Autor:** Leonardo Severino - leoseverino0901@gmail.com;
 - **Data de Criação:** DD/MM/AAAA - HH:MM:SS;
 ## SOBRE
