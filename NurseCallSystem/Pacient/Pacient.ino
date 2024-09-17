@@ -26,12 +26,18 @@ String MACtoString(byte ar[]);
 String GetTime();
 int ButtonPressed();
 bool SendWifiData();
+bool WriteFile(String path, String message);
+bool ReadFile(String path);
+bool AppendFile(String path, String message);
+bool FormatSPIFFS();
 
-
+String data; //Buffer de dados
 //Dados que serão enviados ao servidor
 int pacient; //Número correspondente ao paciente que realizou o chamado
-String timestamp; //Data e Horário do chamado no formato DD-MM-YY HH:MM:SS
-String clientMAC; //Endereço MAC do esp32 no formato AA:BB:CC:DD:EE:FF
+String timestamp; //Data e Horário do chamado
+String clientMAC; //Endereço MAC do esp32
+
+String serverMAC; //Endereço MAC do servidor
 
 //Estados dos botões
 int button1LastState, button1State; //Estado inicial e atual do botão 1
@@ -50,7 +56,7 @@ const char* password  = "a67a70l00"; //Senha da rede WiFi
 const char* server_ip  = "192.168.0.207"; //Endereço IP do servidor
 const int server_port = 80; //Porta do servidor
 
-WiFiClient server; //Cliente WiFi
+WiFiClient server; //Servidor WiFi
 
 void setup(){
   Serial.begin(115200); //Inicialização da serial
@@ -67,6 +73,14 @@ void setup(){
   timestamp = clientMAC = "";
   //Incializa DATA e HORA
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  //Inicialização da partição SPIFFS sem formatar
+  if(SPIFFS.begin(false)){ //Se a inicialização ocorreu com sucesso
+    Serial.println("SPIFFS initialized!");
+  }
+  else{ //Senão
+    Serial.println("Fail do initialize SPIFFS");
+    while (1); //Loop infinito
+  }
   //Leitura do MAC address do esp32
   WiFi.mode(WIFI_STA); //Coloca o WiFi no modo Station
   WiFi.STA.begin();
@@ -86,22 +100,69 @@ void setup(){
   //Imprime informacoes da rede
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+  //Realiza a primeira conexão
+  if(!server.connected()){ //Se não estava conectado ao servidor
+    Serial.print("Connecting to ");
+    Serial.println(server_ip);
+    //Conecta-se ao servidor
+    if(server.connect(server_ip, server_port)){ //Se a conexão ocorreu com sucesso
+      Serial.print("Connected to: ");
+      Serial.println(server_ip);
+      //Envia mensagem ao servidor
+      server.println("Hello! Please inform MAC address");
+      serverMAC = server.readStringUntil('\r'); //Recebe MAC address do servidor
+      Serial.println(serverMAC); //Imprime os dados recebidos no monitor serial
+      server.println("Data received successfuly!"); //Responde ao servidor        
+    }
+    else{ //Senão
+      Serial.println("Failed to Connect to Server");
+      while(1); //Loop infinito    
+    }
+  }
 }
 
 void loop(){
   int button; //Botão pressionado pelo usuário
+  String path; //Caminho do arquivo a ser gravado
+  String message; //Texto a ser gravado no arquivo
 
+  path = "/log.txt"; //Define caminho do arquivo
   button = ButtonPressed(); //Verifica se houve um chamado, registrando em 'pacient' o número correspondente ao paciente que realizou o chamado
   if(button == 1 || button == 2 || button == 3){ //Se houve uma chamada
     timestamp = GetTime(); //Registra em 'timestamp' a data e horário do chamado
-    pacient = button; //Registra o paciente que realizou a chamada  
-    if(SendWifiData()){ //Envia os dados ao servidor
-      Serial.println("Data Sucessfuly Send!");
+    pacient = button; //Registra o paciente que realizou a chamada
+    //Envia dados via wifi
+    if(SendWifiData()){ //Se o envio ocorreu com sucesso
+      //Salva o chamado no arquivo 'log.txt'
+      if(!SPIFFS.exists(path)){ //Se o arquivo ainda não existir
+        message = "PACIENT: " + String(pacient) + '\n' + 
+                  "TIMESTAMP: " + timestamp + '\n' +
+                  "SERVER MAC: " + serverMAC + '\n' +
+                  "CLIENT MAC: " + clientMAC + '\n' +
+                  "\r---------------------------------------\n"; //Registra os dados do chamado em 'message'          
+        if(WriteFile(path, message)){ //Se a escrita ocorrer com sucesso
+          Serial.println("------------------LOG------------------");
+          if(ReadFile(path)){ //Mostra na Serial o conteúdo do arquivo
+            Serial.println();
+          }
+        }
+      }
+      else{ //Senão
+        message = "PACIENT: " + String(pacient) + '\n' + 
+                  "TIMESTAMP: " + timestamp + '\n' +
+                  "SERVER MAC: " + serverMAC + '\n' +
+                  "CLIENT MAC: " + clientMAC + '\n' +
+                  "\r---------------------------------------\n"; //Registra os dados do chamado em 'message'    
+        //Anexa conteúdo ao arquivo
+        if(AppendFile(path, message)){ //Se a anexação ocorreu com sucesso
+          Serial.println("--------------------LOG-------------------");
+          if(ReadFile(path)){ //Mostra na Serial o conteúdo do arquivo
+            Serial.println();
+          }
+        }
+      }
     }
-    else{ //Senão
-      Serial.println("!Error Sending Data!");
-    } 
-  }
+  } 
 }
 
 void ReadMACaddress(){ //Função 'ReadMACaddress', utilizada para ler o endereço MAC do esp32
@@ -177,7 +238,7 @@ bool SendWifiData(){ //Função 'SendWifiData', utilizada para enviar dados via 
     if(server.connect(server_ip, server_port)){ //Se conseguiu se conectar ao servidor
       Serial.print("Connected to ");
       Serial.println(server_ip);
-      data = timestamp + ',' + clientMAC + ',' + String(pacient); //Dados que serão enviados ao servidor
+      data = timestamp + ',' + clientMAC + ',' +  String(pacient); //Dados que serão enviados ao servidor
       Serial.println("Sending Data");
       server.println(data); //Envia dados para o sevidor
       //Aguarda resposta do servidor
@@ -196,7 +257,71 @@ bool SendWifiData(){ //Função 'SendWifiData', utilizada para enviar dados via 
       return false; //Retorna FALSE
     }
   }
-  delay(1000); //Delay de 1s
+
+  return true; //Retorna TRUE
+}
+
+bool WriteFile(String path, String message){ //Função 'WriteFile', utilizada para criar e escrever conteúdo em um arquivo
+  File file; //Arquivo a ser criado
+
+  file = SPIFFS.open(path, FILE_WRITE); //Abre o arquivo, no modo escrita, onde será gravado o conteúdo, e passa o retorno para 'file'
+  if(!file){ //Se houver falha ao abrir o caminho
+    return false; //Retorna FALSE
+  }
+  else{ //Senão
+    if(!file.print(message)){ //Se a criação e escrita do conteúdo no arquivo falhar
+      return false; //Retorna FALSE
+    }
+    else{ //Senão
+      Serial.println("Data written successfully");
+    }
+  }
+  file.close(); //Fecha o arquivo
+
+  return true; //Retorna TRUE
+}
+
+bool ReadFile(String path){ //Função 'ReadFile', utilizada para ler conteúdo de um arquivo
+  File file; //Arquivo a ser lido
+
+  file = SPIFFS.open(path); //Abre o caminho do arquivo da SPIFFS e passa o retorno para 'file'
+  if(!file){ //Se houver falha ao abrir o caminho
+    return false; //Retorna FALSE
+  }
+  else{ //Senão
+    while(file.available()){ //Enquanto houver algum byte disponível para leitura de um arquivo
+      Serial.write(file.read()); //Escreve o conteúdo do arquivo no monitor serial
+    }
+    file.close(); //Fecha o arquivo
+  }
+
+  return true; //Retorna TRUE
+}
+
+bool AppendFile(String path, String message){ //Função 'AppendFile', utilizada para anexar conteúdo a um arquivo
+  File file; //Arquivo ao qual será anexado o conteúdo
+
+  file = SPIFFS.open(path, FILE_APPEND); //Abre o arquivo, no modo anexar, onde será adicionado conteúdo, e passa o retorno para 'file'
+  if(!file){ //Se houver falha ao abrir o caminho
+    return false; //Retorna FALSE
+  }
+  else{ //Senão
+    if(!file.print(message)){ //Se a anexação do conteúdo ao arquivo der errado
+      return false; //Retorna FALSE
+    }
+    else{ //Senão
+      Serial.println("Data written successfully");
+    }
+  }
+  file.close(); //Fecha o arquivo
+
+  return true; //Retorna TRUE
+}
+
+bool FormatSPIFFS(){ //Função 'FormatSPIFFS', utilizada para formatar o sistema de arquivos SPIFFS
+  if(!SPIFFS.format()){ //Se a formatação falhar
+    return false; //Retorna FALSE
+  }
 
   return true; //Retorna TRUE
 }
