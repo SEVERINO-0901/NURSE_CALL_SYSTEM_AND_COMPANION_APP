@@ -12,17 +12,19 @@ retornando uma resposta ao paciente. Então, ele envia os dados para a aplicaç�
 #include <WiFiClient.h>
 #include <WiFiAP.h>
 #include <esp_wifi.h>
-#include <SPIFFS.h>
-#include <FS.h>
-#include <HTTPClient.h>
+
+//Pinos da placa
+#define LED1 18 //Pino do LED 1
+#define LED2 19 //Pino do LED 2
+#define LED3 21 //Pino do LED 3
 
 //Protótipo das funções
 void ReadMACaddress();
 String MACtoString(byte ar[]);
 bool ReadWifiData();
 void GetData(String data);
-
-void SendToApp(String pacient, String timestamp, String clientMAC, String serverMAC);
+void TurnOnLed(int led);
+void SendDataToApp(int pacient, String timestamp, String clientMAC, String serverMAC);
 
 String data; //Buffer de dados
 //Dados que serão recebidos do cliente
@@ -38,6 +40,10 @@ WiFiServer server(80); //Servidor WiFi, inicializado na porta 80
 
 void setup(){
   Serial.begin(115200); //Inicialização da serial
+  //Incializa LEDs como saídas
+  pinMode(LED1, OUTPUT);
+  pinMode(LED2, OUTPUT);
+  pinMode(LED3, OUTPUT);
   //Inicializa variavéis
   pacient = 0;
   data = timestamp = clientMAC = "";
@@ -90,11 +96,9 @@ void loop(){
     }
     else{ //Senão, recebeu uma requisição
       client.println("Data received successfuly!"); //Responde ao cliente
-      GetData(data);
-      Serial.println(pacient);
-      Serial.println(timestamp);
-      Serial.println(serverMAC);
-      Serial.println(clientMAC);     
+      GetData(data); //Separa dados
+      TurnOnLed(pacient); //Acende LED
+      SendDataToApp(pacient, timestamp, clientMAC, serverMAC); //Envia dados para o App     
     }
     //Fecha a conexão com o cliente
     client.stop(); 
@@ -130,33 +134,6 @@ String MACtoString(byte ar[]){ //Função 'MACtoString', utilizada para converte
   return s; //Retorna endereço MAC do esp32 em formato de String
 }
 
-bool ReadWifiData(){ //Função 'ReadWifiData', utilizada para receber dados via WiFi
-  WiFiClient client; //Cliente WiFi
-  
-  client = server.available(); //Verifica se há clientes
-  if(client){ //Se um cliente se conectou
-    Serial.println("New client connected");
-    //Lê dados do cliente
-    while(client.connected()){ //Enquanto o cliente está conectado
-      if(client.connected()){ //Se o cliente ainda estiver conectado
-        data = client.readStringUntil('\r'); //Realiza a leitura dos dados recebidos do cliente através de 'data'  
-        break; //Saí do loop      
-      }
-      else{ //Senão
-        Serial.println("Lost Connection to Client");
-        break; //Saí do loop de repetição    
-      }
-    }
-    client.stop(); //Fecha a conexão com o cliente
-    Serial.println("Client disconnected");
-  }
-  else{ //Senão
-    return false; //Retorna FALSE  
-  }
-
-  return true; //Retorna TRUE
-}
-
 void GetData(String data){ //Função 'GetData', utilizada para separar a String recebida em dados individuais
   int commaIndex; //Índice da vírgula 
 
@@ -166,4 +143,20 @@ void GetData(String data){ //Função 'GetData', utilizada para separar a String
   clientMAC = data.substring(0, commaIndex); //Registra o endereço MAC do cliente em 'clientMAC'
   data = data.substring(commaIndex + 1); //Índice da terceira vírgula
   pacient = data.toInt(); //Registra o ID correspondente ao paciente que realizou o chamado em 'pacient'
+}
+
+void TurnOnLed(int led){ //Função 'TurnOnLed', utilizada para ligar os LEDs
+  if(led == 1){ //Se foi o paciente 1
+    digitalWrite(LED1, HIGH); //Acende LED 1    
+  }
+  else if(led == 2){ //Se foi o paciente 2
+    digitalWrite(LED2, HIGH); //Acende LED 2    
+  }
+  else if(led == 3){ //Se foi o paciente 3
+    digitalWrite(LED3, HIGH); //Acende LED 3   
+  }
+}
+
+void SendDataToApp(int pacient, String timestamp, String clientMAC, String serverMAC){ //Função 'SendDataToApp', utilizada para enviar os dados para o App em React Native
+  //Envia dados para a aplicação em React Native  
 }
