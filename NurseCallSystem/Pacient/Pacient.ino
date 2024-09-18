@@ -9,33 +9,31 @@ timestamp do chamado.
 
 //Inclusão das bibliotecas
 #include <WiFi.h>
-#include <WiFiClient.h>
+#include <HTTPClient.h>
 #include <time.h>
-#include <esp_wifi.h>
 #include <SPIFFS.h>
 #include <FS.h>
 
-//Pinos dos botões
+//Pinos da placa
 #define BUTTON1 5 //Pino do botão 1
 #define BUTTON2 18 //Pino do botão 2
 #define BUTTON3 19 //Pino do botão 3
+#define LED 2 //Pino do Led
 
 //Protótipo das funções
-void ReadMACaddress();
-String MACtoString(byte ar[]);
 String GetTime();
+String HttpGet(String route);
+void HttpPost(String route, String payload);
 int ButtonPressed();
-bool SendWifiData();
 bool WriteFile(String path, String message);
 bool ReadFile(String path);
 bool AppendFile(String path, String message);
 bool FormatSPIFFS();
 
-String data; //Buffer de dados
 //Dados que serão enviados ao servidor
 int pacient; //Número correspondente ao paciente que realizou o chamado
 String timestamp; //Data e Horário do chamado
-String clientMAC; //Endereço MAC do esp32
+String esp32MAC; //Endereço MAC do esp32
 
 String serverMAC; //Endereço MAC do servidor
 
@@ -53,10 +51,7 @@ const int   daylightOffset_sec = 0;
 const char* ssid  = "SEVERINO_01"; //Nome da rede WiFi
 const char* password  = "a67a70l00"; //Senha da rede WiFi
 //Credenciais do servidor
-const char* server_ip  = "192.168.0.207"; //Endereço IP do servidor
-const int server_port = 80; //Porta do servidor
-
-WiFiClient server; //Servidor WiFi
+const char* serverIP  = "192.168.0.207"; //Endereço IP do servidor
 
 void setup(){
   Serial.begin(115200); //Inicialização da serial
@@ -64,16 +59,18 @@ void setup(){
   pinMode(BUTTON1, INPUT_PULLUP);
   pinMode(BUTTON2, INPUT_PULLUP);
   pinMode(BUTTON3, INPUT_PULLUP);
+  //Inicializa o LED como saída
+  pinMode(LED, OUTPUT);
   //Inicializa estado atual dos botões
   button1State = digitalRead(BUTTON1);
   button2State = digitalRead(BUTTON2);
   button3State = digitalRead(BUTTON3);
   //Inicializa variavéis
   pacient = 0;
-  timestamp = clientMAC = "";
+  timestamp = "";
   //Incializa DATA e HORA
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  //Inicialização da partição SPIFFS sem formatar
+  //Inicialização da partição SPIFFS
   if(SPIFFS.begin(false)){ //Se a inicialização ocorreu com sucesso
     Serial.println("SPIFFS initialized!");
   }
@@ -81,47 +78,85 @@ void setup(){
     Serial.println("Fail do initialize SPIFFS");
     while (1); //Loop infinito
   }
-  //Leitura do MAC address do esp32
-  WiFi.mode(WIFI_STA); //Coloca o WiFi no modo Station
-  WiFi.STA.begin();
-  Serial.print("[DEFAULT]ESP32 Board MAC Address: ");
-  ReadMACaddress(); //Lê o endereço MAC
-  Serial.println(clientMAC); //Exibe o endereço MAC no monitor serial
   //Conexão na rede WiFi
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid, password); //Inicia a conexão WiFi na rede 'ssid' com a senha 'password'
   while(WiFi.status() != WL_CONNECTED){ //Enquanto não conecta na rede
     Serial.print(".");
-    delay(500); //Delay de 0.5s
+    delay(1000); //Delay de 1s
   }
   Serial.println();
   Serial.println("WiFi connected.");
   //Imprime informacoes da rede
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-  //Realiza a primeira conexão
-  if(!server.connected()){ //Se não estava conectado ao servidor
-    Serial.print("Connecting to ");
-    Serial.println(server_ip);
-    //Conecta-se ao servidor
-    if(server.connect(server_ip, server_port)){ //Se a conexão ocorreu com sucesso
-      Serial.print("Connected to: ");
-      Serial.println(server_ip);
-      //Envia mensagem ao servidor
-      server.println("Hello! Please inform MAC address");
-      serverMAC = server.readStringUntil('\r'); //Recebe MAC address do servidor
-      Serial.println(serverMAC); //Imprime os dados recebidos no monitor serial
-      server.println("Data received successfuly!"); //Responde ao servidor        
-    }
-    else{ //Senão
-      Serial.println("Failed to Connect to Server");
-      while(1); //Loop infinito    
-    }
-  }
+  //Leitura do endereço MAC do esp32
+  esp32MAC = WiFi.macAddress();
+  Serial.println("MAC Address: " + esp32MAC);
+  // Realizar a requisição HTTP para o servidor
+  Serial.println("Sending: Hi");
+  Serial.println("Server response: " + HttpGet("/Salute"));
+  //Solicitar o endereço MAC do servidor
+  Serial.println("Requesting MAC address");
+  serverMAC = HttpGet("/MacAddress");
+  Serial.println("Server response: " + serverMAC);
+  //Se tudo tiver dado certo, liga o LED da placa
+  digitalWrite(LED, HIGH);
+  //Teste de solicitacao
+  HttpPost("/NewCall", String payload);
+}
+void loop(){
+  delay(1);
 }
 
-void loop(){
+String HttpGet(String route){
+  int httpResponseCode;
+  String serverURL, response;
+  HTTPClient http;
+  
+  if(WiFi.status() == WL_CONNECTED){ //Se o WiFi estiver conectado
+    serverURL = "http://" + String(serverIP) + route;
+    http.begin(serverURL);
+    httpResponseCode = http.GET();
+    if(httpResponseCode > 0){
+      response = http.getString();
+    }
+    else{
+      Serial.println("Erro na requisição: " + String(httpResponseCode));
+    }
+    http.end();
+  }
+  else{
+    Serial.println("WiFi não conectado");
+  }
+
+  return response;
+}
+void HttpPost(String route, String payload){
+  int httpResponseCode;
+  String serverURL, response;
+  HTTPClient http;
+  
+  if(WiFi.status() == WL_CONNECTED){
+    serverURL = "http://" + String(serverIP) + route;
+    http.begin(serverURL);
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    httpResponseCode = http.POST(payload);
+    if(httpResponseCode > 0){
+      response = http.getString();
+      Serial.println("Resposta do Servidor: " + response);
+    }
+    else{
+      Serial.println("Erro na requisição: " + String(httpResponseCode));
+    }
+    http.end();
+  }
+  else{
+    Serial.println("WiFi não conectado");
+  }
+}
+  /*
   int button; //Botão pressionado pelo usuário
   String path; //Caminho do arquivo a ser gravado
   String message; //Texto a ser gravado no arquivo
@@ -165,34 +200,6 @@ void loop(){
   } 
 }
 
-void ReadMACaddress(){ //Função 'ReadMACaddress', utilizada para ler o endereço MAC do esp32
-  uint8_t mac[6];
-  esp_err_t ret; //Indicador da leitura do endereço MAC
-
-  ret = esp_wifi_get_mac(WIFI_IF_STA, mac); //Realiza a leitura do endereço MAC
-  if(ret == ESP_OK){ //Se a leitura ocorreu com sucesso
-    clientMAC = MACtoString((byte*) &mac); //Converte o endereço MAC para o formato String e registra em 'clientMAC'
-  }
-  else{ //Senão
-    Serial.println("Failed to read MAC address");
-  }
-}
-
-String MACtoString(byte ar[]){ //Função 'MACtoString', utilizada para converter o endereço MAC para o formato de String, para ser enviado ao cliente
-  String s; //Endereço MAC em formato de String
-  char buf[3]; //buffer de dados
-
-  for(byte i = 0; i < 6; ++i){ //Laço de repetição
-    sprintf(buf, "%02X", ar[i]); //Converte byte para char
-    s += buf; //Acrescenta o char à String
-    if(i < 5){ //Se Terminou de receber o byte
-      s += ':'; //Acrescenta ':'
-    }
-  }
-
-  return s; //Retorna endereço MAC do esp32 em formato de String
-}
-
 String GetTime(){ //Função 'GetTime', utilizada para ler data e hora atual
   struct tm timeinfo; //Informaçãoes de data e hora
   char local_time[20]; //buffer de dados
@@ -225,40 +232,6 @@ int ButtonPressed(){ //Função para verificar se um botão foi pressionado
   else { //Se nenhum botão foi pressionado
     return 0; //Retorna 0
   }
-}
-
-bool SendWifiData(){ //Função 'SendWifiData', utilizada para enviar dados via WiFi
-  String data; //Buffer de dados
-
-  //Conexão ao servidor
-  if(!server.connected()){ //Se não estava conectado ao servidor
-    Serial.print("Connecting to ");
-    Serial.println(server_ip);
-    //Conecta-se ao servidor
-    if(server.connect(server_ip, server_port)){ //Se conseguiu se conectar ao servidor
-      Serial.print("Connected to ");
-      Serial.println(server_ip);
-      data = timestamp + ',' + clientMAC + ',' +  String(pacient); //Dados que serão enviados ao servidor
-      Serial.println("Sending Data");
-      server.println(data); //Envia dados para o sevidor
-      //Aguarda resposta do servidor
-      while(server.connected()){ //Enquanto estiver conectado ao servidor
-        if(server.available()){ //Se o servidor estiver disponível
-          Serial.println(server.readStringUntil('\r')); //Exibe dados recebidos do servidor no monitor serial
-          break; //Saí do loop de repetição
-        }
-      }
-      //Fecha a conexão com o servidor
-      server.stop();
-      Serial.println("Connection to server closed");
-    }
-    else{ //Se a conexão falhou
-      Serial.println("Failed to Connect to Server");
-      return false; //Retorna FALSE
-    }
-  }
-
-  return true; //Retorna TRUE
 }
 
 bool WriteFile(String path, String message){ //Função 'WriteFile', utilizada para criar e escrever conteúdo em um arquivo
@@ -324,4 +297,4 @@ bool FormatSPIFFS(){ //Função 'FormatSPIFFS', utilizada para formatar o sistem
   }
 
   return true; //Retorna TRUE
-}
+}*/

@@ -9,18 +9,18 @@ retornando uma resposta ao paciente. Então, ele envia os dados para a aplicaç�
 
 //Inclusão das bibliotecas
 #include <WiFi.h>
-#include <WiFiClient.h>
-#include <WiFiAP.h>
-#include <esp_wifi.h>
+#include <ESPAsyncWebServer.h> //
+//#include <WiFiClient.h>
+//#include <WiFiAP.h>
+//#include <esp_wifi.h>
 
 //Pinos da placa
+#define LED 2 //Pino do Led da placa
 #define LED1 18 //Pino do LED 1
 #define LED2 19 //Pino do LED 2
 #define LED3 21 //Pino do LED 3
 
 //Protótipo das funções
-void ReadMACaddress();
-String MACtoString(byte ar[]);
 bool ReadWifiData();
 void GetData(String data);
 void TurnOnLed(int led);
@@ -30,47 +30,67 @@ String data; //Buffer de dados
 //Dados que serão recebidos do cliente
 int pacient; //Número correspondente ao paciente que realizou o chamado
 String timestamp; //Data e Horário do chamado no formato DD-MM-YY HH:MM:SS
+String esp32MAC; //Endereço MAC do servidor  
+
 String clientMAC; //Endereço MAC do cliente
-String serverMAC; //Endereço MAC do servidor  
 
 //Credenciais da rede
 const char* ssid  = "SEVERINO_01"; //Nome da rede WiFi
 const char* password  = "a67a70l00"; //Senha da rede WiFi
-WiFiServer server(80); //Servidor WiFi, inicializado na porta 80
+AsyncWebServer server(80);  // Servidor rodando na porta 80
+//WiFiServer server(80); //Servidor WiFi, inicializado na porta 80
 
 void setup(){
   Serial.begin(115200); //Inicialização da serial
   //Incializa LEDs como saídas
+  pinMode(LED, OUTPUT);
   pinMode(LED1, OUTPUT);
   pinMode(LED2, OUTPUT);
   pinMode(LED3, OUTPUT);
   //Inicializa variavéis
   pacient = 0;
   data = timestamp = clientMAC = "";
-  //Leitura do MAC address do esp32
-  WiFi.mode(WIFI_STA); //Coloca o WiFi no modo Station
-  WiFi.STA.begin();
-  Serial.print("[DEFAULT]ESP32 Board MAC Address: ");
-  ReadMACaddress(); //Lê o endereço MAC
-  Serial.println(clientMAC); //Exibe o endereço MAC no monitor serial
-   //Conexão na rede WiFi
+  //Conexão na rede WiFi
   Serial.print("Connecting to ");
   Serial.println(ssid);
   WiFi.begin(ssid, password); //Inicia a conexão WiFi na rede 'ssid' com a senha 'password'
   while(WiFi.status() != WL_CONNECTED){ //Enquanto não conecta na rede
     Serial.print(".");
-    delay(500); //Delay de 0.5s
+    delay(1000); //Delay de 1s
   }
   Serial.println();
   Serial.println("WiFi connected.");
   //Imprime informacoes da rede
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-  server.begin(); //Inicia o servidor
+  //Leitura do endereço MAC do esp32
+  esp32MAC = WiFi.macAddress();
+  Serial.println("MAC Address: " + esp32MAC);
+  //Rota que responde uma saudacao com um "Oi"
+  server.on("/Salute", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "Oi");
+  });
+  //Rota para obter o endereço MAC do servidor
+  server.on("/MacAddress", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", esp32MAC);
+  });
+  //Rota para realizar uma chamada
+  server.on("/NewCall", HTTP_POST, [](AsyncWebServerRequest *request) {
+    Serial.println(request->value());
+    request->send(200, "text/plain", "Lâmpada ligada com sucesso");  
+  }
+  //Inicia o servidor
+  server.begin(); 
   Serial.println("Server Initiated!");
+  //Se tudo tiver dado certo, liga o LED da placa
+  digitalWrite(LED, HIGH);
 }
 
 void loop(){
+  //Nada
+}
+
+/*void loop(){
   WiFiClient client; //Cliente WiFi
   
   client = server.available(); //Verifica se há clientes
@@ -106,34 +126,6 @@ void loop(){
   }
 }
 
-void ReadMACaddress(){ //Função 'ReadMACaddress', utilizada para ler o endereço MAC do esp32
-  uint8_t mac[6];
-  esp_err_t ret; //Indicador da leitura do endereço MAC
-
-  ret = esp_wifi_get_mac(WIFI_IF_STA, mac); //Realiza a leitura do endereço MAC
-  if(ret == ESP_OK){ //Se a leitura ocorreu com sucesso
-    serverMAC = MACtoString((byte*) &mac); //Converte o endereço MAC para o formato String e registra em 'clientMAC'
-  }
-  else{ //Senão
-    Serial.println("Failed to read MAC address");
-  }
-}
-
-String MACtoString(byte ar[]){ //Função 'MACtoString', utilizada para converter o endereço MAC para o formato de String, para ser enviado ao cliente
-  String s; //Endereço MAC em formato de String
-  char buf[3]; //buffer de dados
-
-  for(byte i = 0; i < 6; ++i){ //Laço de repetição
-    sprintf(buf, "%02X", ar[i]); //Converte byte para char
-    s += buf; //Acrescenta o char à String
-    if(i < 5){ //Se Terminou de receber o byte
-      s += ':'; //Acrescenta ':'
-    }
-  }
-
-  return s; //Retorna endereço MAC do esp32 em formato de String
-}
-
 void GetData(String data){ //Função 'GetData', utilizada para separar a String recebida em dados individuais
   int commaIndex; //Índice da vírgula 
 
@@ -159,4 +151,4 @@ void TurnOnLed(int led){ //Função 'TurnOnLed', utilizada para ligar os LEDs
 
 void SendDataToApp(int pacient, String timestamp, String clientMAC, String serverMAC){ //Função 'SendDataToApp', utilizada para enviar os dados para o App em React Native
   //Envia dados para a aplicação em React Native  
-}
+}*/
