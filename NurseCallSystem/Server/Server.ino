@@ -9,10 +9,7 @@ retornando uma resposta ao paciente. Então, ele envia os dados para a aplicaç�
 
 //Inclusão das bibliotecas
 #include <WiFi.h>
-#include <ESPAsyncWebServer.h> //
-//#include <WiFiClient.h>
-//#include <WiFiAP.h>
-//#include <esp_wifi.h>
+#include <WebServer.h>
 
 //Pinos da placa
 #define LED 2 //Pino do Led da placa
@@ -21,12 +18,8 @@ retornando uma resposta ao paciente. Então, ele envia os dados para a aplicaç�
 #define LED3 21 //Pino do LED 3
 
 //Protótipo das funções
-bool ReadWifiData();
-void GetData(String data);
-void TurnOnLed(int led);
-void SendDataToApp(int pacient, String timestamp, String clientMAC, String serverMAC);
 
-String data; //Buffer de dados
+
 //Dados que serão recebidos do cliente
 int pacient; //Número correspondente ao paciente que realizou o chamado
 String timestamp; //Data e Horário do chamado no formato DD-MM-YY HH:MM:SS
@@ -37,7 +30,7 @@ String clientMAC; //Endereço MAC do cliente
 //Credenciais da rede
 const char* ssid  = "SEVERINO_01"; //Nome da rede WiFi
 const char* password  = "a67a70l00"; //Senha da rede WiFi
-AsyncWebServer server(80);  // Servidor rodando na porta 80
+WebServer server(80);  // Servidor rodando na porta 80
 //WiFiServer server(80); //Servidor WiFi, inicializado na porta 80
 
 void setup(){
@@ -49,7 +42,7 @@ void setup(){
   pinMode(LED3, OUTPUT);
   //Inicializa variavéis
   pacient = 0;
-  data = timestamp = clientMAC = "";
+  timestamp = clientMAC = "";
   //Conexão na rede WiFi
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -67,18 +60,11 @@ void setup(){
   esp32MAC = WiFi.macAddress();
   Serial.println("MAC Address: " + esp32MAC);
   //Rota que responde uma saudacao com um "Oi"
-  server.on("/Salute", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", "Oi");
-  });
+  server.on("/Salute", HTTP_GET, HandleSalute);
   //Rota para obter o endereço MAC do servidor
-  server.on("/MacAddress", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", esp32MAC);
-  });
+  server.on("/MacAddress", HTTP_GET, HandleMacAddress);
   //Rota para realizar uma chamada
-  server.on("/NewCall", HTTP_POST, [](AsyncWebServerRequest *request) {
-    Serial.println(request->value());
-    request->send(200, "text/plain", "Lâmpada ligada com sucesso");  
-  }
+  server.on("/NewCall", HTTP_POST, HandleCall);
   //Inicia o servidor
   server.begin(); 
   Serial.println("Server Initiated!");
@@ -87,43 +73,37 @@ void setup(){
 }
 
 void loop(){
-  //Nada
+  //Mantém o servidor rodando
+  server.handleClient();
 }
 
-/*void loop(){
-  WiFiClient client; //Cliente WiFi
+
+void HandleSalute(){ // Função que responde à rota GET /Salute
+  server.send(200, "text/plain", "Hello!");  
+}
+
+void HandleMacAddress(){ // Função que responde à rota GET /MacAddress
+  server.send(200, "text/plain", esp32MAC);  
+}
+
+void HandleCall(){ // Função que lida com o POST na rota /PostData
+  String message;
   
-  client = server.available(); //Verifica se há clientes
-  if(client){ //Se um cliente se conectou
-    Serial.println("New client connected");
-    //Lê dados do cliente
-    while(client.connected()){ //Enquanto o cliente está conectado
-      if(client.connected()){ //Se o cliente ainda estiver conectado
-        data = client.readStringUntil('\r'); //Realiza a leitura dos dados recebidos do cliente através de 'data'  
-        Serial.println(data);
-        break; //Saí do loop      
-      }
-      else{ //Senão
-        Serial.println("Lost Connection to Client");
-        break; //Saí do loop de repetição    
-      }
-    }
-    //Envia resposta ao cliente
-    if(data == "Hello! Please inform MAC address"){ //Se recebeu uma solicitação de endereço MAC
-      client.println(serverMAC); //Envia endereço MAC
-      data = client.readStringUntil('\r'); //Recebe a resposta do cliente
-      Serial.println(data); 
-    }
-    else{ //Senão, recebeu uma requisição
-      client.println("Data received successfuly!"); //Responde ao cliente
-      GetData(data); //Separa dados
-      TurnOnLed(pacient); //Acende LED
-      SendDataToApp(pacient, timestamp, clientMAC, serverMAC); //Envia dados para o App     
-    }
-    //Fecha a conexão com o cliente
-    client.stop(); 
-    Serial.println("Client disconnected");
+  if(server.hasArg("plain")){ // Verifica se há dados no corpo da requisição
+    message = server.arg("plain"); // Pega o conteúdo do corpo da requisição
+    Serial.println("Data received: " + message);
+    server.send(200, "text/plain", "Data received sucessfully!"); // Responde ao cliente
+    GetData(message);
+    TurnOnLed(pacient);
+    Serial.println("PACIENT: " + String(pacient));
+    Serial.println("TIMESTAMP: " + timestamp);
+    Serial.println("SERVER MAC: " + esp32MAC);
+    Serial.println("CLIENT MAC: " + clientMAC);
   }
+  else{ //Senão
+    // Responde com um erro se não houver dados no corpo da requisição
+    server.send(400, "text/plain", "Error");  
+  }  
 }
 
 void GetData(String data){ //Função 'GetData', utilizada para separar a String recebida em dados individuais
@@ -137,18 +117,18 @@ void GetData(String data){ //Função 'GetData', utilizada para separar a String
   pacient = data.toInt(); //Registra o ID correspondente ao paciente que realizou o chamado em 'pacient'
 }
 
+
 void TurnOnLed(int led){ //Função 'TurnOnLed', utilizada para ligar os LEDs
   if(led == 1){ //Se foi o paciente 1
+    Serial.println("TURNING ON LED 1");
     digitalWrite(LED1, HIGH); //Acende LED 1    
   }
   else if(led == 2){ //Se foi o paciente 2
+    Serial.println("TURNING ON LED 2");
     digitalWrite(LED2, HIGH); //Acende LED 2    
   }
   else if(led == 3){ //Se foi o paciente 3
+    Serial.println("TURNING ON LED 3");
     digitalWrite(LED3, HIGH); //Acende LED 3   
   }
 }
-
-void SendDataToApp(int pacient, String timestamp, String clientMAC, String serverMAC){ //Função 'SendDataToApp', utilizada para enviar os dados para o App em React Native
-  //Envia dados para a aplicação em React Native  
-}*/

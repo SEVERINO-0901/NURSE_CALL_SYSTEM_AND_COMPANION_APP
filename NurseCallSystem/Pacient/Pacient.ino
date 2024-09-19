@@ -21,10 +21,11 @@ timestamp do chamado.
 #define LED 2 //Pino do Led
 
 //Protótipo das funções
-String GetTime();
 String HttpGet(String route);
-void HttpPost(String route, String payload);
+void HttpPost(String route, String message);
+String GetTime();
 int ButtonPressed();
+void SaveData(String path);
 bool WriteFile(String path, String message);
 bool ReadFile(String path);
 bool AppendFile(String path, String message);
@@ -95,7 +96,7 @@ void setup(){
   esp32MAC = WiFi.macAddress();
   Serial.println("MAC Address: " + esp32MAC);
   // Realizar a requisição HTTP para o servidor
-  Serial.println("Sending: Hi");
+  Serial.println("Sending: Hello!");
   Serial.println("Server response: " + HttpGet("/Salute"));
   //Solicitar o endereço MAC do servidor
   Serial.println("Requesting MAC address");
@@ -103,100 +104,19 @@ void setup(){
   Serial.println("Server response: " + serverMAC);
   //Se tudo tiver dado certo, liga o LED da placa
   digitalWrite(LED, HIGH);
-  //Teste de solicitacao
-  HttpPost("/NewCall", String payload);
 }
 void loop(){
-  delay(1);
-}
-
-String HttpGet(String route){
-  int httpResponseCode;
-  String serverURL, response;
-  HTTPClient http;
-  
-  if(WiFi.status() == WL_CONNECTED){ //Se o WiFi estiver conectado
-    serverURL = "http://" + String(serverIP) + route;
-    http.begin(serverURL);
-    httpResponseCode = http.GET();
-    if(httpResponseCode > 0){
-      response = http.getString();
-    }
-    else{
-      Serial.println("Erro na requisição: " + String(httpResponseCode));
-    }
-    http.end();
-  }
-  else{
-    Serial.println("WiFi não conectado");
-  }
-
-  return response;
-}
-void HttpPost(String route, String payload){
-  int httpResponseCode;
-  String serverURL, response;
-  HTTPClient http;
-  
-  if(WiFi.status() == WL_CONNECTED){
-    serverURL = "http://" + String(serverIP) + route;
-    http.begin(serverURL);
-    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    httpResponseCode = http.POST(payload);
-    if(httpResponseCode > 0){
-      response = http.getString();
-      Serial.println("Resposta do Servidor: " + response);
-    }
-    else{
-      Serial.println("Erro na requisição: " + String(httpResponseCode));
-    }
-    http.end();
-  }
-  else{
-    Serial.println("WiFi não conectado");
-  }
-}
-  /*
   int button; //Botão pressionado pelo usuário
-  String path; //Caminho do arquivo a ser gravado
-  String message; //Texto a ser gravado no arquivo
-
-  path = "/log.txt"; //Define caminho do arquivo
-  button = ButtonPressed(); //Verifica se houve um chamado, registrando em 'pacient' o número correspondente ao paciente que realizou o chamado
+  String message, path;
+  
+  button = ButtonPressed(); //Verifica se houve um chamado
   if(button == 1 || button == 2 || button == 3){ //Se houve uma chamada
     timestamp = GetTime(); //Registra em 'timestamp' a data e horário do chamado
     pacient = button; //Registra o paciente que realizou a chamada
-    //Envia dados via wifi
-    if(SendWifiData()){ //Se o envio ocorreu com sucesso
-      //Salva o chamado no arquivo 'log.txt'
-      if(!SPIFFS.exists(path)){ //Se o arquivo ainda não existir
-        message = "PACIENT: " + String(pacient) + '\n' + 
-                  "TIMESTAMP: " + timestamp + '\n' +
-                  "SERVER MAC: " + serverMAC + '\n' +
-                  "CLIENT MAC: " + clientMAC + '\n' +
-                  "\r---------------------------------------\n"; //Registra os dados do chamado em 'message'          
-        if(WriteFile(path, message)){ //Se a escrita ocorrer com sucesso
-          Serial.println("------------------LOG------------------");
-          if(ReadFile(path)){ //Mostra na Serial o conteúdo do arquivo
-            Serial.println();
-          }
-        }
-      }
-      else{ //Senão
-        message = "PACIENT: " + String(pacient) + '\n' + 
-                  "TIMESTAMP: " + timestamp + '\n' +
-                  "SERVER MAC: " + serverMAC + '\n' +
-                  "CLIENT MAC: " + clientMAC + '\n' +
-                  "\r---------------------------------------\n"; //Registra os dados do chamado em 'message'    
-        //Anexa conteúdo ao arquivo
-        if(AppendFile(path, message)){ //Se a anexação ocorreu com sucesso
-          Serial.println("--------------------LOG-------------------");
-          if(ReadFile(path)){ //Mostra na Serial o conteúdo do arquivo
-            Serial.println();
-          }
-        }
-      }
-    }
+    message = timestamp + ',' + esp32MAC + ',' + String(pacient);
+    HttpPost("/NewCall", message);
+    path = "/log.txt"; //Define caminho do arquivo
+    SaveData(path);  
   } 
 }
 
@@ -232,6 +152,85 @@ int ButtonPressed(){ //Função para verificar se um botão foi pressionado
   else { //Se nenhum botão foi pressionado
     return 0; //Retorna 0
   }
+}
+
+String HttpGet(String route){
+  int httpResponseCode;
+  String serverURL, response;
+  HTTPClient http;
+  
+  if(WiFi.status() == WL_CONNECTED){ //Se o WiFi estiver conectado
+    serverURL = "http://" + String(serverIP) + route;
+    http.begin(serverURL);
+    httpResponseCode = http.GET();
+    if(httpResponseCode > 0){
+      response = http.getString();
+    }
+    else{
+      Serial.println("Error: " + String(httpResponseCode));
+    }
+    http.end();
+  }
+  else{
+    Serial.println("WiFi not connected");
+  }
+
+  return response;
+}
+void HttpPost(String route, String message){
+  int httpResponseCode;
+  String serverURL, response;
+  HTTPClient http;
+  
+  if(WiFi.status() == WL_CONNECTED){
+    serverURL = "http://" + String(serverIP) + route;
+    http.begin(serverURL);
+    http.addHeader("Content-Type", "text/plain");
+    httpResponseCode = http.POST(message);
+    if(httpResponseCode > 0){
+      response = http.getString();
+      Serial.println("Server response: " + response);
+    }
+    else{
+      Serial.println("Error: " + String(httpResponseCode));
+    }
+    http.end();
+  }
+  else{
+    Serial.println("WiFi not connected");
+  }
+}
+  
+void SaveData(String path){
+  String message;
+  
+  if(!SPIFFS.exists(path)){ //Se o arquivo ainda não existir
+    message = "PACIENT: " + String(pacient) + '\n' + 
+              "TIMESTAMP: " + timestamp + '\n' +
+              "SERVER MAC: " + serverMAC + '\n' +
+              "CLIENT MAC: " + esp32MAC + '\n' +
+              "\r---------------------------------------\n"; //Registra os dados do chamado em 'message'          
+    if(WriteFile(path, message)){ //Se a escrita ocorrer com sucesso
+      Serial.println("------------------LOG------------------");
+      if(ReadFile(path)){ //Mostra na Serial o conteúdo do arquivo
+        Serial.println();
+      }
+    }
+  }
+  else{ //Senão
+    message = "PACIENT: " + String(pacient) + '\n' + 
+              "TIMESTAMP: " + timestamp + '\n' +
+              "SERVER MAC: " + serverMAC + '\n' +
+              "CLIENT MAC: " + esp32MAC + '\n' +
+              "\r---------------------------------------\n"; //Registra os dados do chamado em 'message'    
+    //Anexa conteúdo ao arquivo
+    if(AppendFile(path, message)){ //Se a anexação ocorreu com sucesso
+      Serial.println("--------------------LOG-------------------");
+      if(ReadFile(path)){ //Mostra na Serial o conteúdo do arquivo
+        Serial.println();
+      }
+    }
+  }  
 }
 
 bool WriteFile(String path, String message){ //Função 'WriteFile', utilizada para criar e escrever conteúdo em um arquivo
@@ -297,4 +296,4 @@ bool FormatSPIFFS(){ //Função 'FormatSPIFFS', utilizada para formatar o sistem
   }
 
   return true; //Retorna TRUE
-}*/
+}
