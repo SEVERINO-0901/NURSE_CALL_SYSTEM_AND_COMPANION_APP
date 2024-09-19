@@ -1,11 +1,33 @@
+import React, { useEffect } from "react";
 import { 
     StyleSheet, 
     Text, 
     View 
 } from "react-native";
+import axios from "axios";
 
 export default function CallScreen() {
-  return (
+  const FetchData = async() => { //Função 'FetchData', utilizada para requisitar dados
+    try{
+      const message = await axios.get("http://192.168.0.207/Data"); //Requisita dados do ESP32
+      if(message.data != ""){ //Se tiver dados
+        console.log(message.data);
+      }    
+    }
+    catch(error){ //Detecta erros
+      console.error("Error: ", error);
+    }
+  };
+
+  useEffect(() => {
+    FetchData(); //Execução inicial
+    const interval = setInterval(() => {
+      FetchData(); 
+    }, 1000); //Requisita dados a cada 1s
+    return () => clearInterval(interval);
+  }, []);
+  
+  return(
     <View style = {styles.container}>
       <View style = {styles.callContainer}>
         <View style = {styles.pacientBox}>
