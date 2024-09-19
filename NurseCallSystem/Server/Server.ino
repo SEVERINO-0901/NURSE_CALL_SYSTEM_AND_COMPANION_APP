@@ -18,7 +18,12 @@ retornando uma resposta ao paciente. Então, ele envia os dados para a aplicaç�
 #define LED3 21 //Pino do LED 3
 
 //Protótipo das funções
-
+void HandleSalute();
+void HandleMacAddress();
+void HandleCall();
+void HandleSendData();
+void GetData(String data);
+void TurnOnLed(int led);
 
 //Dados que serão recebidos do cliente
 int pacient; //Número correspondente ao paciente que realizou o chamado
@@ -26,12 +31,12 @@ String timestamp; //Data e Horário do chamado no formato DD-MM-YY HH:MM:SS
 String esp32MAC; //Endereço MAC do servidor  
 
 String clientMAC; //Endereço MAC do cliente
+bool sendData; //Controla se vai enviar dados ao App
 
 //Credenciais da rede
 const char* ssid  = "SEVERINO_01"; //Nome da rede WiFi
 const char* password  = "a67a70l00"; //Senha da rede WiFi
 WebServer server(80);  // Servidor rodando na porta 80
-//WiFiServer server(80); //Servidor WiFi, inicializado na porta 80
 
 void setup(){
   Serial.begin(115200); //Inicialização da serial
@@ -43,6 +48,7 @@ void setup(){
   //Inicializa variavéis
   pacient = 0;
   timestamp = clientMAC = "";
+  sendData = false;
   //Conexão na rede WiFi
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -65,6 +71,8 @@ void setup(){
   server.on("/MacAddress", HTTP_GET, HandleMacAddress);
   //Rota para realizar uma chamada
   server.on("/NewCall", HTTP_POST, HandleCall);
+  //Rota para enviar dados ao App
+  server.on("/Data", HandleSendData);
   //Inicia o servidor
   server.begin(); 
   Serial.println("Server Initiated!");
@@ -87,14 +95,15 @@ void HandleMacAddress(){ // Função que responde à rota GET /MacAddress
 }
 
 void HandleCall(){ // Função que lida com o POST na rota /PostData
-  String message;
+  String message, payload;
   
   if(server.hasArg("plain")){ // Verifica se há dados no corpo da requisição
     message = server.arg("plain"); // Pega o conteúdo do corpo da requisição
     Serial.println("Data received: " + message);
     server.send(200, "text/plain", "Data received sucessfully!"); // Responde ao cliente
     GetData(message);
-    TurnOnLed(pacient);
+    sendData = true; //Habilita o envio de dados
+    TurnOnLed(pacient); //Acende o LED do paciente
     Serial.println("PACIENT: " + String(pacient));
     Serial.println("TIMESTAMP: " + timestamp);
     Serial.println("SERVER MAC: " + esp32MAC);
@@ -104,6 +113,19 @@ void HandleCall(){ // Função que lida com o POST na rota /PostData
     // Responde com um erro se não houver dados no corpo da requisição
     server.send(400, "text/plain", "Error");  
   }  
+}
+
+void HandleSendData(){
+  String jsonData;
+  
+  if(sendData){ //Se tiver dados para enviar
+    jsonData = String(pacient) + ',' + timestamp + ',' + esp32MAC + ',' + clientMAC;
+    server.send(200, "application/json", jsonData); //Envia dados
+    sendData = false; //Desabilita o envio de dados      
+  }
+  else{ //Senão
+    server.send(200, "application/json", ""); //Envia dados  
+  }
 }
 
 void GetData(String data){ //Função 'GetData', utilizada para separar a String recebida em dados individuais
