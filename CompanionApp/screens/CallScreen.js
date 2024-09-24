@@ -26,20 +26,6 @@ export default function CallScreen() {
   }, []);
   
   return(
-    <View style={styles.container}>
-      {data ? (
-        <>
-          <Text style={styles.text}>Paciente: {data.pacient}</Text>
-          <Text style={styles.text}>Horário: {data.timestamp}</Text>
-          <Text style={styles.text}>ESP32 MAC: {data.esp32MAC}</Text>
-          <Text style={styles.text}>Client MAC: {data.clientMAC}</Text>
-        </>
-      ) : (
-        <Text style={styles.text}>Carregando dados...</Text>
-      )}
-    </View>
-  );
-    {/*
     <View style = {styles.container}>
       <View style = {styles.callContainer}>
         <View style = {styles.pacientBox}>
@@ -49,6 +35,20 @@ export default function CallScreen() {
             <View style = {styles.bar}/>
         </View>
       </View>
+      
+      <View style={styles.container}>
+      {data ? (
+        <>
+          <Text style={styles.text}>Paciente: {data.pacient}</Text>
+          <Text style={styles.text}>Horário: {data.timestamp}</Text>
+          <Text style={styles.text}>ESP32 MAC: {data.serverMAC}</Text>
+          <Text style={styles.text}>Client MAC: {data.clientMAC}</Text>
+        </>
+      ) : (
+        <Text style={styles.text}>Carregando dados...</Text>
+      )}
+    </View>
+
       <View style = {styles.callContainer}>
         <View style = {styles.pacientBox}>
             <Text style = {styles.textStyle}>Paciente 2</Text>
@@ -57,6 +57,7 @@ export default function CallScreen() {
             <View style = {styles.bar}/>
         </View>
       </View>
+      
       <View style = {styles.callContainer}>
         <View style = {styles.pacientBox}>
             <Text style = {styles.textStyle}>Paciente 3</Text>
@@ -65,8 +66,8 @@ export default function CallScreen() {
             <View style = {styles.bar}/>
         </View>
       </View>
-    </View>
-    */}
+    </View>  
+  );
 }
 
 const styles = StyleSheet.create({
@@ -115,5 +116,5 @@ const styles = StyleSheet.create({
     height: "80%",
     marginHorizontal: 5,
     backgroundColor: '#ccc'
-  },
+  }
 });
