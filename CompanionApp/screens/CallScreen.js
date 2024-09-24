@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { 
     StyleSheet, 
     Text, 
@@ -7,27 +7,39 @@ import {
 import axios from "axios";
 
 export default function CallScreen() {
-  const FetchData = async() => { //Função 'FetchData', utilizada para requisitar dados
+  const [data, setData] = useState(null);
+
+  const FetchData = async () => {
     try{
-      const message = await axios.get("http://192.168.0.207/Data"); //Requisita dados do ESP32
-      if(message.data != ""){ //Se tiver dados
-        console.log(message.data);
-      }    
+      const espData = await axios.get("http://192.168.0.224:3000/data");
+      setData(espData.data);
     }
-    catch(error){ //Detecta erros
-      console.error("Error: ", error);
-    }
+    catch(error){
+      console.log("Error: ", error);
+    }  
   };
 
   useEffect(() => {
-    FetchData(); //Execução inicial
-    const interval = setInterval(() => {
-      FetchData(); 
-    }, 1000); //Requisita dados a cada 1s
+    FetchData();
+    const interval = setInterval(FetchData, 1000);
     return () => clearInterval(interval);
   }, []);
   
   return(
+    <View style={styles.container}>
+      {data ? (
+        <>
+          <Text style={styles.text}>Paciente: {data.pacient}</Text>
+          <Text style={styles.text}>Horário: {data.timestamp}</Text>
+          <Text style={styles.text}>ESP32 MAC: {data.esp32MAC}</Text>
+          <Text style={styles.text}>Client MAC: {data.clientMAC}</Text>
+        </>
+      ) : (
+        <Text style={styles.text}>Carregando dados...</Text>
+      )}
+    </View>
+  );
+    {/*
     <View style = {styles.container}>
       <View style = {styles.callContainer}>
         <View style = {styles.pacientBox}>
@@ -54,7 +66,7 @@ export default function CallScreen() {
         </View>
       </View>
     </View>
-  );
+    */}
 }
 
 const styles = StyleSheet.create({
