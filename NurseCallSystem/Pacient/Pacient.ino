@@ -125,8 +125,17 @@ String GetTime(){ //Função 'GetTime', utilizada para ler data e hora atual
   char local_time[20]; //buffer de dados
 
   //Registra DATA e HORA do chamado
-  getLocalTime(&timeinfo);
-  sprintf(local_time, "%02d-%02d-%02d %02d:%02d:%02d", timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year - 100, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec); //Registra DATA e HORA no formato DD-MM-YY HH:MM:SS na variavél 'local_time'
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return String("00-00-00 00:00:00");
+  }
+  sprintf(local_time, "%04d-%02d-%02d %02d:%02d:%02d", //Registra DATA e HORA no formato YYYY-MM-DD HH:MM:SS na variavél 'local_time' 
+    timeinfo.tm_year + 1900, //Ano(YYYY)
+    timeinfo.tm_mon + 1, //Mês(MM)
+    timeinfo.tm_mday, //Dia(DD) 
+    timeinfo.tm_hour, //Hora(HH)
+    timeinfo.tm_min, //Minutos(MM)
+    timeinfo.tm_sec); //Segundos(SS)
 
   return String(local_time); //Retorna data e hora do chamado no formato String
 }
