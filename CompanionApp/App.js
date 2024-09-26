@@ -1,26 +1,20 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import LoginScreen from "./screens/LoginScreen";
-import InfoScreen from "./screens/InfoScreen";
+import CallScreen from "./screens/CallScreen";
 
 const Stack = createNativeStackNavigator();
 
+
+
 export default function App() {
-  return(
+  return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName = "Login"
+        initialRouteName = "CallsScreen"
       >
         <Stack.Screen 
-          name = "Login"
-          component = {LoginScreen}
-        />
-        <Stack.Screen 
-          name = "Info"
-          component = {InfoScreen}
-          initialParams = {{
-            user: "Guest"
-          }}
+          name = "CallsScreen"
+          component = {CallScreen}
         />
       </Stack.Navigator>
     </NavigationContainer>

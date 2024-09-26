@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "PROJETO_01",
-    "slug": "PROJETO_01",
+    "name": "CompanionApp",
+    "slug": "CompanionApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -22,9 +22,6 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    },
-    "plugins": [
-      "expo-secure-store"
-    ]
+    }
   }
 }

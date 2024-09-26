@@ -2,21 +2,41 @@ import React, { useState, useEffect } from "react";
 import { 
     StyleSheet, 
     Text, 
-    View 
+    View,
+    Button, 
+    ScrollView
 } from "react-native";
 import axios from "axios";
 
 export default function CallScreen() {
-  const [data, setData] = useState(null);
+  const [pacientsData, setPacientsData] = useState([null, null, null, null, null, null, null, null]);
 
   const FetchData = async () => {
     try{
       const espData = await axios.get("http://192.168.0.224:3000/data");
-      setData(espData.data);
+      const pacientIndex = espData.data.pacient - 1; // Índice do paciente
+
+      if((pacientIndex >= 0) && (pacientIndex <= 2)){
+        setPacientsData(prevData => {
+          const updatedData = [...prevData];
+
+          updatedData[pacientIndex] = espData.data;
+          return updatedData; //Atualiza o paciente
+        });
+      }
     }
     catch(error){
       console.log("Error: ", error);
     }  
+  };
+
+  const ClearPacient = (index) => {
+    setPacientsData(prevData => {
+      const updatedData = [...prevData];
+
+      updatedData[index] = null; //Limpa os dados do paciente
+      return updatedData;
+    });
   };
 
   useEffect(() => {
@@ -26,47 +46,40 @@ export default function CallScreen() {
   }, []);
   
   return(
-    <View style = {styles.container}>
-      <View style = {styles.callContainer}>
-        <View style = {styles.pacientBox}>
-            <Text style = {styles.textStyle}>Paciente 1</Text>
-        </View>
-        <View style = {styles.ledBox}>
-            <View style = {styles.bar}/>
-        </View>
+    <ScrollView>
+      <View style = {styles.container}>
+        {pacientsData.map((data, index) => (
+          <View 
+            key={index} 
+            style={styles.callContainer}>
+            <View style = {styles.pacientContainer}>
+              <Text style = {styles.pacientTextStyle}>Paciente {index + 1}</Text>
+              <View style = {styles.infoContainer}>
+                {data && (
+                  <>
+                    <Text style = {styles.callInfoText}>Timestamp: {data.timestamp}</Text>
+                    <Text style = {styles.callInfoText}>Server MAC: {data.serverMAC}</Text>
+                    <Text style = {styles.callInfoText}>Client MAC: {data.clientMAC}</Text>
+                    <Button
+                      title = "OK"
+                      color = "midnightblue"
+                      onPress = {() => ClearPacient(index)}
+                    />
+                  </>
+                )}
+              </View>
+              <View style = {styles.ledContainer}>
+                {data ? (
+                  <View style = {styles.activeLed} />
+                ) : (
+                  <View style = {styles.inactiveLed} />
+                )}
+              </View>
+            </View>
+          </View>
+        ))}
       </View>
-      
-      <View style={styles.container}>
-      {data ? (
-        <>
-          <Text style={styles.text}>Paciente: {data.pacient}</Text>
-          <Text style={styles.text}>Horário: {data.timestamp}</Text>
-          <Text style={styles.text}>ESP32 MAC: {data.serverMAC}</Text>
-          <Text style={styles.text}>Client MAC: {data.clientMAC}</Text>
-        </>
-      ) : (
-        <Text style={styles.text}>Carregando dados...</Text>
-      )}
-    </View>
-
-      <View style = {styles.callContainer}>
-        <View style = {styles.pacientBox}>
-            <Text style = {styles.textStyle}>Paciente 2</Text>
-        </View>
-        <View style = {styles.ledBox}>
-            <View style = {styles.bar}/>
-        </View>
-      </View>
-      
-      <View style = {styles.callContainer}>
-        <View style = {styles.pacientBox}>
-            <Text style = {styles.textStyle}>Paciente 3</Text>
-        </View>
-        <View style = {styles.ledBox}>
-            <View style = {styles.bar}/>
-        </View>
-      </View>
-    </View>  
+    </ScrollView>
   );
 }
 
@@ -74,47 +87,54 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 20,
-    justifyContent: "space-around",
-    alignItems: "flex-start",
-    backgroundColor: "#f2f2f2"
+    justifyContent: "flex-start",
+    alignItems: "center",
+    backgroundColor: "#f2f2f2",
   },
   callContainer: {
     width: "100%",
-    height: "30%",
+    marginVertical: 10,
     padding: 10,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center", 
-  },
-  pacientBox: {
-    width: "70%",
-    height: "35%",
-    padding: 10,
-    borderWidth: 2,
-    justifyContent: "center",
-    alignItems: "center",
-    borderColor: "#000",
     backgroundColor: "#fff",
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    position: "relative", // Necessário para posicionar o LED
   },
-  ledBox: {
-    width: "30%",
-    height: "35%",
-    padding: 10,
-    borderWidth: 2,
-    justifyContent: "center",
-    alignItems: "center",
-    borderColor: "#000",
-    backgroundColor: "#fff",
+  pacientContainer: {
+    width: "100%", 
+    justifyContent: "flex-start",
+    alignItems: "flex-start", 
   },
-  textStyle: {
+  infoContainer: {
+    marginTop: 10, 
+  },
+  pacientTextStyle: {
     fontSize: 18,
-    fontWeight: "condensedBold",
-    textAlign: "center"  
+    fontWeight: "bold",
+    textAlign: "left",
   },
-  bar: {
-    width: "50%",
-    height: "80%",
-    marginHorizontal: 5,
-    backgroundColor: '#ccc'
+  ledContainer: {
+    position: "absolute",
+    top: 10, 
+    right: 10, // Posiciona o LED no canto superior direito
+  },
+  inactiveLed: {
+    width: 30, // Aumentando o tamanho do LED
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#ccc',
+  },
+  activeLed: {
+    width: 30, // Aumentando o tamanho do LED
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#4caf50',
+  },
+  callInfoText: {
+    fontSize: 15,
+    textAlign: "left",
   }
 });
