@@ -119,9 +119,10 @@ void GetData(String data){ //Função 'GetData', utilizada para separar a String
 
   commaIndex = data.indexOf(','); //Índice da primeira vírgula
   timestamp = data.substring(0, commaIndex); //Registra a data e horário do chamado em 'timestamp'
-  data = data.substring(commaIndex + 1); //Índice da segunda vírgula
+  data = data.substring(commaIndex + 1); //Atualiza 'data'
+  commaIndex = data.indexOf(','); //Índice da segunda vírgula
   clientMAC = data.substring(0, commaIndex); //Registra o endereço MAC do cliente em 'clientMAC'
-  data = data.substring(commaIndex + 1); //Índice da terceira vírgula
+  data = data.substring(commaIndex + 1);//Atualiza 'data'
   pacient = data.toInt(); //Registra o ID correspondente ao paciente que realizou o chamado em 'pacient'
 }
 
@@ -143,21 +144,21 @@ void TurnOnLed(int led){ //Função 'TurnOnLed', utilizada para ligar os LEDs
 
 void SendDataToApp(String pacient, String timestamp, String serverMAC, String clientMAC){
   HTTPClient http;
-  String jsonPayload;
+  String payload;
   int httpResponseCode;
   String response;
   
-  if(WiFi.status() == WL_CONNECTED){
+  if(WiFi.status() == WL_CONNECTED){ //Se estiver conectado ao WiFi
     http.begin(serverUrl); //Conecta ao servidor
     http.addHeader("Content-Type", "application/json"); //Adiciona o cabeçalho
     // Criar o JSON a ser enviado
-    jsonPayload = "{";
-    jsonPayload += "\"pacient\":" + pacient + ",";
-    jsonPayload += "\"timestamp\":\"" + timestamp + "\",";
-    jsonPayload += "\"esp32MAC\":\"" + serverMAC + "\",";
-    jsonPayload += "\"clientMAC\":\"" + clientMAC + "\"";
-    jsonPayload += "}";
-    httpResponseCode = http.POST(jsonPayload); // Enviar a solicitação POST
+    payload = "{";
+    payload += "\"pacient\":" + pacient + ",";
+    payload += "\"timestamp\":\"" + timestamp + "\",";
+    payload += "\"serverMAC\":\"" + serverMAC + "\",";
+    payload += "\"clientMAC\":\"" + clientMAC + "\"";
+    payload += "}";
+    httpResponseCode = http.POST(payload); // Enviar a solicitação POST
     if(httpResponseCode > 0){
       response = http.getString();
       Serial.println("Server response: " + response);
