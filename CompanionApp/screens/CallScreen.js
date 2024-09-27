@@ -4,7 +4,8 @@ import {
     Text, 
     View,
     Button, 
-    ScrollView
+    ScrollView,
+    Alert
 } from "react-native";
 import axios from "axios";
 
@@ -21,6 +22,7 @@ export default function CallScreen() {
           const updatedData = [...prevData];
 
           updatedData[pacientIndex] = espData.data;
+          Alert.alert("!!!NEW CALL!!!", `Pacient: ${espData.data.pacient}\nPlease attend!`); //Cria um alerta para nova chamada
           return updatedData; //Atualiza o paciente
         });
       }
