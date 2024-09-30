@@ -19,11 +19,20 @@ timestamp do chamado.
 #define BUTTON2 18 //Pino do botão 2
 #define BUTTON3 19 //Pino do botão 3
 #define LED 2 //Pino do Led
+#define PACIENT1 13 //Pino do paciente 1
+#define PACIENT2 12 //Pino do paciente 2
+#define PACIENT3 14 //Pino do paciente 3
+#define PACIENT4 27 //Pino do paciente 4
+#define PACIENT5 26 //Pino do paciente 5
+#define PACIENT6 25 //Pino do paciente 6
+#define PACIENT7 33 //Pino do paciente 7
+#define PACIENT8 32 //Pino do paciente 8
 
 //Protótipo das funções
 String HttpGet(String route);
 void HttpPost(String route, String message);
 String GetTime();
+int GetPacient();
 int ButtonPressed();
 void SaveData(String path);
 bool WriteFile(String path, String message);
@@ -33,10 +42,16 @@ bool FormatSPIFFS();
 
 //Dados que serão enviados ao servidor
 int pacient; //Número correspondente ao paciente que realizou o chamado
+int priority; //Prioridade do chamado
 String timestamp; //Data e Horário do chamado
 String esp32MAC; //Endereço MAC do esp32
 
 String serverMAC; //Endereço MAC do servidor
+
+// Array para armazenar os pinos
+int pacients[] = {PACIENT1, PACIENT2, PACIENT3, PACIENT4, PACIENT5, PACIENT6, PACIENT7, PACIENT8};
+// Array para armazenar os estados binários dos pinos
+int pacientsStates[8] = {0};
 
 //Estados dos botões
 int button1LastState, button1State; //Estado inicial e atual do botão 1
@@ -52,7 +67,7 @@ const int   daylightOffset_sec = 0;
 const char* ssid  = "SEVERINO_01"; //Nome da rede WiFi
 const char* password  = "a67a70l00"; //Senha da rede WiFi
 //Credenciais do servidor
-const char* serverIP  = "192.168.0.207"; //Endereço IP do servidor
+const char* serverIP  = "192.168.0.142"; //Endereço IP do servidor
 
 void setup(){
   Serial.begin(115200); //Inicialização da serial
@@ -60,6 +75,10 @@ void setup(){
   pinMode(BUTTON1, INPUT_PULLUP);
   pinMode(BUTTON2, INPUT_PULLUP);
   pinMode(BUTTON3, INPUT_PULLUP);
+  //Configura todos os pinos dos pacients como entradas
+  for(int i = 0; i < 8; i++){
+    pinMode(pacients[i], INPUT);
+  }
   //Inicializa o LED como saída
   pinMode(LED, OUTPUT);
   //Inicializa estado atual dos botões
@@ -112,11 +131,20 @@ void loop(){
   button = ButtonPressed(); //Verifica se houve um chamado
   if(button == 1 || button == 2 || button == 3){ //Se houve uma chamada
     timestamp = GetTime(); //Registra em 'timestamp' a data e horário do chamado
-    pacient = button; //Registra o paciente que realizou a chamada
-    message = timestamp + ',' + esp32MAC + ',' + String(pacient);
-    HttpPost("/NewCall", message);
-    path = "/log.txt"; //Define caminho do arquivo
-    SaveData(path);  
+    pacient = GetPacient(); //Retorna paciente
+    if(pacient != 0){
+      priority = button; //Registra prioridade
+      message = timestamp + ',' + esp32MAC + ',' + String(pacient) + ',' + String(priority);
+      HttpPost("/NewCall", message);
+      path = "/log.txt"; //Define caminho do arquivo
+      SaveData(path);
+    }
+    
+    //pacient = button; //Registra o paciente que realizou a chamada
+    //message = timestamp + ',' + esp32MAC + ',' + String(pacient);
+    //HttpPost("/NewCall", message);
+    //path = "/log.txt"; //Define caminho do arquivo
+    //SaveData(path);  
   } 
 }
 
@@ -138,6 +166,20 @@ String GetTime(){ //Função 'GetTime', utilizada para ler data e hora atual
     timeinfo.tm_sec); //Segundos(SS)
 
   return String(local_time); //Retorna data e hora do chamado no formato String
+}
+
+int GetPacient(){
+  // Atualiza os estados binários dos pinos
+  for(int i = 0; i < 8; i++){
+    pacientsStates[i] = digitalRead(pacients[i]);  // Leitura do estado do pino (HIGH ou LOW)
+  }
+  //Verifica qual bit está em 1
+  for(int i = 0; i < 8; i++){
+    if(pacientsStates[i] == 1){
+      return i + 1; //Retorna o índice do bit ativo
+    }
+  }
+  return 0; //Retorna 0   
 }
 
 int ButtonPressed(){ //Função para verificar se um botão foi pressionado

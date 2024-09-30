@@ -23,15 +23,15 @@ void HandleSalute();
 void HandleMacAddress();
 void HandleCall();
 void GetData(String data);
-void TurnOnLed(int led);
+void TurnOnLed(int priority);
 void SendDataToApp(String pacient, String timestamp, String serverMAC, String clientMAC);
 
 
 //Dados que serão recebidos do cliente
 int pacient; //Número correspondente ao paciente que realizou o chamado
+int callPriority, currentPriority; //Prioridade do chamado
 String timestamp; //Data e Horário do chamado no formato DD-MM-YY HH:MM:SS
 String esp32MAC; //Endereço MAC do servidor  
-
 String clientMAC; //Endereço MAC do cliente
 
 //Credenciais da rede
@@ -48,7 +48,7 @@ void setup(){
   pinMode(LED2, OUTPUT);
   pinMode(LED3, OUTPUT);
   //Inicializa variavéis
-  pacient = 0;
+  pacient = callPriority = currentPriority = 0;
   timestamp = clientMAC = "";
   //Conexão na rede WiFi
   Serial.print("Connecting to ");
@@ -90,7 +90,7 @@ void HandleSalute(){ // Função que responde à rota GET /Salute
 }
 
 void HandleMacAddress(){ // Função que responde à rota GET /MacAddress
-  server.send(200, "text/plain", esp32MAC);  
+  server.send(200, "text/plain", esp32MAC); 
 }
 
 void HandleCall(){ // Função que lida com o POST na rota /PostData
@@ -101,9 +101,10 @@ void HandleCall(){ // Função que lida com o POST na rota /PostData
     Serial.println("Data received: " + message);
     server.send(200, "text/plain", "Data received sucessfully!"); // Responde ao cliente
     GetData(message); //Separa os dados
-    TurnOnLed(pacient); //Acende o LED do paciente
-    SendDataToApp(String(pacient), timestamp, esp32MAC, clientMAC); //Envia dados para o App
+    TurnOnLed(callPriority); //Acende o LED do paciente
+    //SendDataToApp(String(pacient), timestamp, esp32MAC, clientMAC); //Envia dados para o App
     Serial.println("PACIENT: " + String(pacient));
+    Serial.println("PRIORIDADE: " + String(callPriority));
     Serial.println("TIMESTAMP: " + timestamp);
     Serial.println("SERVER MAC: " + esp32MAC);
     Serial.println("CLIENT MAC: " + clientMAC);
@@ -120,15 +121,42 @@ void GetData(String data){ //Função 'GetData', utilizada para separar a String
   commaIndex = data.indexOf(','); //Índice da primeira vírgula
   timestamp = data.substring(0, commaIndex); //Registra a data e horário do chamado em 'timestamp'
   data = data.substring(commaIndex + 1); //Atualiza 'data'
+  
   commaIndex = data.indexOf(','); //Índice da segunda vírgula
   clientMAC = data.substring(0, commaIndex); //Registra o endereço MAC do cliente em 'clientMAC'
-  data = data.substring(commaIndex + 1);//Atualiza 'data'
+  data = data.substring(commaIndex + 1); //Atualiza 'data'
+
+  commaIndex = data.indexOf(','); //Índice da terceira vírgula
   pacient = data.toInt(); //Registra o ID correspondente ao paciente que realizou o chamado em 'pacient'
+  data = data.substring(commaIndex + 1); //Atualiza 'data'
+  
+  callPriority = data.toInt();
 }
 
 
-void TurnOnLed(int led){ //Função 'TurnOnLed', utilizada para ligar os LEDs
-  if(led == 1){ //Se foi o paciente 1
+void TurnOnLed(int priority){ //Função 'TurnOnLed', utilizada para ligar os LEDs
+  if(priority > currentPriority){
+    if(priority == 1){
+      Serial.println("TURNING ON LED 1");
+      digitalWrite(LED1, HIGH); //Acende LED 1
+      digitalWrite(LED2, LOW); //Apaga LED 2
+      digitalWrite(LED3, LOW); //Apaga LED 3
+    }
+    else if(priority == 2){
+      Serial.println("TURNING ON LED 2");
+      digitalWrite(LED2, HIGH); //Acende LED 2
+      digitalWrite(LED1, LOW); //Apaga LED 1
+      digitalWrite(LED3, LOW); //Apaga LED 3  
+    }
+    else if(priority == 3){
+      Serial.println("TURNING ON LED 3");
+      digitalWrite(LED3, HIGH); //Acende LED 3
+      digitalWrite(LED1, LOW); //Apaga LED 1
+      digitalWrite(LED2, LOW); //Apaga LED 2     
+    }
+  }
+  currentPriority = priority;
+  /*if(led == 1){ //Se foi o paciente 1
     Serial.println("TURNING ON LED 1");
     digitalWrite(LED1, HIGH); //Acende LED 1    
   }
@@ -139,7 +167,7 @@ void TurnOnLed(int led){ //Função 'TurnOnLed', utilizada para ligar os LEDs
   else if(led == 3){ //Se foi o paciente 3
     Serial.println("TURNING ON LED 3");
     digitalWrite(LED3, HIGH); //Acende LED 3   
-  }
+  }*/
 }
 
 void SendDataToApp(String pacient, String timestamp, String serverMAC, String clientMAC){
