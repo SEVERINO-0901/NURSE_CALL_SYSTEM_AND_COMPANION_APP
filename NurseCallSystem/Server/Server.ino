@@ -24,7 +24,7 @@ void HandleMacAddress();
 void HandleCall();
 void GetData(String data);
 void TurnOnLed(int priority);
-void SendDataToApp(String pacient, String timestamp, String serverMAC, String clientMAC);
+void SendDataToApp(String pacient, String priority, String timestamp, String serverMAC, String clientMAC);
 
 
 //Dados que serão recebidos do cliente
@@ -102,7 +102,7 @@ void HandleCall(){ // Função que lida com o POST na rota /PostData
     server.send(200, "text/plain", "Data received sucessfully!"); // Responde ao cliente
     GetData(message); //Separa os dados
     TurnOnLed(callPriority); //Acende o LED do paciente
-    //SendDataToApp(String(pacient), timestamp, esp32MAC, clientMAC); //Envia dados para o App
+    SendDataToApp(String(pacient), String(callPriority), timestamp, esp32MAC, clientMAC); //Envia dados para o App
     Serial.println("PACIENT: " + String(pacient));
     Serial.println("PRIORIDADE: " + String(callPriority));
     Serial.println("TIMESTAMP: " + timestamp);
@@ -170,7 +170,7 @@ void TurnOnLed(int priority){ //Função 'TurnOnLed', utilizada para ligar os LE
   }*/
 }
 
-void SendDataToApp(String pacient, String timestamp, String serverMAC, String clientMAC){
+void SendDataToApp(String pacient, String priority, String timestamp, String serverMAC, String clientMAC){
   HTTPClient http;
   String payload;
   int httpResponseCode;
@@ -182,6 +182,7 @@ void SendDataToApp(String pacient, String timestamp, String serverMAC, String cl
     // Criar o JSON a ser enviado
     payload = "{";
     payload += "\"pacient\":" + pacient + ",";
+    payload += "\"priority\":" + priority + ",";
     payload += "\"timestamp\":\"" + timestamp + "\",";
     payload += "\"serverMAC\":\"" + serverMAC + "\",";
     payload += "\"clientMAC\":\"" + clientMAC + "\"";
