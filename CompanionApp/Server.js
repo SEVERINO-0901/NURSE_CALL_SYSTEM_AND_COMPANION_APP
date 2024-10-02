@@ -8,14 +8,14 @@ let calls = []; //Lista de chamadas recebidas
 
 //rota para receber dados do esp32
 app.post("/data", (req, res) => {
-  const { pacient, timestamp, serverMAC, clientMAC } = req.body; //Registra os dados
-  if(!pacient || !timestamp || !serverMAC || !clientMAC){
+  const { pacient, priority, timestamp, serverMAC, clientMAC } = req.body; //Registra os dados
+  if(!pacient || !priority || !timestamp || !serverMAC || !clientMAC){
     return res.status(400).send("Missing data");
   }
   else{
     console.log("Data Received: ");
-    console.log(pacient, timestamp, serverMAC, clientMAC);
-    calls.push({pacient, timestamp, serverMAC, clientMAC}); //Adiciona a chamada ao final da fila
+    console.log(pacient, priority, timestamp, serverMAC, clientMAC);
+    calls.push({pacient, priority, timestamp, serverMAC, clientMAC}); //Adiciona a chamada ao final da fila
     res.status(200).send("Data received sucessfuly!"); // Responder para o ESP32 que os dados foram recebidos
   }
 });

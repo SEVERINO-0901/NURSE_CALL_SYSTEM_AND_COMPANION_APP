@@ -17,12 +17,13 @@ export default function CallScreen() {
       const espData = await axios.get("http://192.168.0.224:3000/data");
       const pacientIndex = espData.data.pacient - 1; // Índice do paciente
 
-      if((pacientIndex >= 0) && (pacientIndex <= 2)){
+      if((pacientIndex >= 0) && (pacientIndex <= 7)){
         setPacientsData(prevData => {
           const updatedData = [...prevData];
 
           updatedData[pacientIndex] = espData.data;
-          Alert.alert("!!!NEW CALL!!!", `Pacient: ${espData.data.pacient}\nPlease attend!`); //Cria um alerta para nova chamada
+          Alert.alert("!!!NEW CALL!!!", `Pacient: ${espData.data.pacient}\nPriority: ${espData.data.priority}\nPlease attend!`); //Cria um alerta para nova chamada
+          
           return updatedData; //Atualiza o paciente
         });
       }
@@ -35,10 +36,22 @@ export default function CallScreen() {
   const ClearPacient = (index) => {
     setPacientsData(prevData => {
       const updatedData = [...prevData];
-
       updatedData[index] = null; //Limpa os dados do paciente
       return updatedData;
     });
+  };
+
+  const sortPacients = (data) => {
+    return data
+      .filter(item => item !== null) //Remove dados nulos
+      .sort((a, b) => {
+        if(a.priority !== b.priority){
+          return (b.priority - a.priority); //Ordem de prioridade
+        }
+        else{
+          return (new Date(a.timestamp) - new Date(b.timestamp)); //Ordem de timestamp
+        }  
+      });
   };
 
   useEffect(() => {
@@ -47,15 +60,17 @@ export default function CallScreen() {
     return () => clearInterval(interval);
   }, []);
   
+  const sortedPacients = sortPacients(pacientsData);
+
   return(
     <ScrollView>
       <View style = {styles.container}>
-        {pacientsData.map((data, index) => (
+        {sortedPacients.map((data, index) => (
           <View 
-            key={index} 
-            style={styles.callContainer}>
+            key = {index} 
+            style = {styles.callContainer}>
             <View style = {styles.pacientContainer}>
-              <Text style = {styles.pacientTextStyle}>Paciente {index + 1}</Text>
+              <Text style = {styles.pacientTextStyle}>Paciente {data.pacient}</Text>
               <View style = {styles.infoContainer}>
                 {data && (
                   <>
@@ -65,14 +80,23 @@ export default function CallScreen() {
                     <Button
                       title = "OK"
                       color = "midnightblue"
-                      onPress = {() => ClearPacient(index)}
+                      onPress = {() => ClearPacient(data.pacient - 1)}
                     />
                   </>
                 )}
               </View>
               <View style = {styles.ledContainer}>
                 {data ? (
-                  <View style = {styles.activeLed} />
+                  //Altera a cor do LED com base na prioridade do chamado
+                  <View 
+                    style = {[
+                      styles.activeLed,
+                      data.priority === 1 && styles.greenLed,
+                      data.priority === 2 && styles.yellowLed,
+                      data.priority === 3 && styles.redLed,
+                    ]} 
+                  
+                  />
                 ) : (
                   <View style = {styles.inactiveLed} />
                 )}
@@ -91,7 +115,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     justifyContent: "flex-start",
     alignItems: "center",
-    backgroundColor: "#f2f2f2",
+    backgroundColor: "#eaeaea",
   },
   callContainer: {
     width: "100%",
@@ -123,17 +147,25 @@ const styles = StyleSheet.create({
     top: 10, 
     right: 10, // Posiciona o LED no canto superior direito
   },
+  activeLed: {
+    width: 30, // Aumentando o tamanho do LED
+    height: 30,
+    borderRadius: 15,
+  },
+  greenLed: {
+    backgroundColor: "#008000" //Verde para prioridade 1
+  },
+  yellowLed: {
+    backgroundColor: "#ffd700" //Amarelo dourado para prioridade 2
+  },
+  redLed: {
+    backgroundColor: "#ff0000" //Vermelhor para prioridade 3
+  },
   inactiveLed: {
     width: 30, // Aumentando o tamanho do LED
     height: 30,
     borderRadius: 15,
     backgroundColor: '#ccc',
-  },
-  activeLed: {
-    width: 30, // Aumentando o tamanho do LED
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#4caf50',
   },
   callInfoText: {
     fontSize: 15,
