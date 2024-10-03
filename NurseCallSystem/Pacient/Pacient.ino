@@ -15,48 +15,20 @@ timestamp do chamado.
 #include <FS.h>
 
 //Pinos da placa
-#define BUTTON1 5 //Pino do botão 1
-#define BUTTON2 18 //Pino do botão 2
-#define BUTTON3 19 //Pino do botão 3
+#define BUTTON1 18 //Pino do botão 1
+#define BUTTON2 19 //Pino do botão 2
+#define BUTTON3 21 //Pino do botão 3
 #define LED 2 //Pino do Led
-#define PACIENT1 13 //Pino do paciente 1
-#define PACIENT2 12 //Pino do paciente 2
-#define PACIENT3 14 //Pino do paciente 3
-#define PACIENT4 27 //Pino do paciente 4
-#define PACIENT5 26 //Pino do paciente 5
-#define PACIENT6 25 //Pino do paciente 6
-#define PACIENT7 33 //Pino do paciente 7
-#define PACIENT8 32 //Pino do paciente 8
 
 //Protótipo das funções
 String HttpGet(String route);
 void HttpPost(String route, String message);
-String GetTime();
-int GetPacient();
-int ButtonPressed();
-void SaveData(String path);
-bool WriteFile(String path, String message);
-bool ReadFile(String path);
-bool AppendFile(String path, String message);
-bool FormatSPIFFS();
 
-//Dados que serão enviados ao servidor
-int pacient; //Número correspondente ao paciente que realizou o chamado
-int priority; //Prioridade do chamado
-String timestamp; //Data e Horário do chamado
-String esp32MAC; //Endereço MAC do esp32
-
-String serverMAC; //Endereço MAC do servidor
-
-// Array para armazenar os pinos
-int pacients[] = {PACIENT1, PACIENT2, PACIENT3, PACIENT4, PACIENT5, PACIENT6, PACIENT7, PACIENT8};
-// Array para armazenar os estados binários dos pinos
-int pacientsStates[8] = {0};
-
-//Estados dos botões
-int button1LastState, button1State; //Estado inicial e atual do botão 1
-int button2LastState, button2State; //Estado inicial e atual do botão 2
-int button3LastState, button3State; //Estado inicial e atual do botão 3
+//Variavéis globais
+String esp32MAC; //Endereço MAC do esp32 
+String lampMAC; //Endereço MAC do esp32 da lampada
+int button1LastState, button2LastState, button3LastState; //Estado anterior dos botões
+int button1State, button2State, button3State; //Estado atual do botões 
 
 //Informacoes de DATA e HORA
 const char* ntpServer = "pool.ntp.org";
@@ -64,10 +36,11 @@ const long  gmtOffset_sec = -10800;
 const int   daylightOffset_sec = 0;
 
 //Credenciais da rede
-const char* ssid  = "SEVERINO_01"; //Nome da rede WiFi
-const char* password  = "a67a70l00"; //Senha da rede WiFi
-//Credenciais do servidor
-const char* serverIP  = "192.168.0.142"; //Endereço IP do servidor
+//const char* ssid  = ""; //Nome da rede WiFi
+//const char* password  = ""; //Senha da rede WiFi
+const char* ssid  = ""; //Nome da rede WiFi
+const char* password  = ""; //Senha da rede WiFi
+const char* lampIP  = ""; //Endereço IP da lampada
 
 void setup(){
   Serial.begin(115200); //Inicialização da serial
@@ -75,21 +48,14 @@ void setup(){
   pinMode(BUTTON1, INPUT_PULLUP);
   pinMode(BUTTON2, INPUT_PULLUP);
   pinMode(BUTTON3, INPUT_PULLUP);
-  //Configura todos os pinos dos pacients como entradas
-  for(int i = 0; i < 8; i++){
-    pinMode(pacients[i], INPUT);
-  }
   //Inicializa o LED como saída
   pinMode(LED, OUTPUT);
-  //Inicializa estado atual dos botões
-  button1State = digitalRead(BUTTON1);
-  button2State = digitalRead(BUTTON2);
-  button3State = digitalRead(BUTTON3);
-  //Inicializa variavéis
-  pacient = 0;
-  timestamp = "";
-  //Incializa DATA e HORA
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  //Inicializa variavéis globais
+  esp32MAC = lampMAC = "";
+  button1State = digitalRead(BUTTON1); //Inicializa estado do botão 1
+  button2State = digitalRead(BUTTON2); //Inicializa estado do botão 2
+  button3State = digitalRead(BUTTON3); //Inicializa estado do botão 3
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); //Incializa DATA e HORA
   //Inicialização da partição SPIFFS
   if(SPIFFS.begin(false)){ //Se a inicialização ocorreu com sucesso
     Serial.println("SPIFFS initialized!");
@@ -119,33 +85,111 @@ void setup(){
   Serial.println("Server response: " + HttpGet("/Salute"));
   //Solicitar o endereço MAC do servidor
   Serial.println("Requesting MAC address");
-  serverMAC = HttpGet("/MacAddress");
-  Serial.println("Server response: " + serverMAC);
+  lampMAC = HttpGet("/MacAddress");
+  Serial.println("Server response: " + lampMAC);
   //Se tudo tiver dado certo, liga o LED da placa
   digitalWrite(LED, HIGH);
 }
+
 void loop(){
   int button; //Botão pressionado pelo usuário
-  String message, path;
-  
+  int pacient; //Paciente que realizou a chamada
+  int priority; //Prioridade do chamado
+  String timestamp; //Data e horário do chamado
+  String message; //Dados a serem enviados 
+
+  //Inicializa variavéis internas
+  button = priority = 0;
+  timestamp = message = "";
   button = ButtonPressed(); //Verifica se houve um chamado
-  if(button == 1 || button == 2 || button == 3){ //Se houve uma chamada
+  if(button == 1 || button == 2 || button == 3){ //Se houve um chamado
+    pacient = 0; //Registra em pacient o paciente que realizou o chamado
     timestamp = GetTime(); //Registra em 'timestamp' a data e horário do chamado
-    pacient = GetPacient(); //Retorna paciente
-    if(pacient != 0){
-      priority = button; //Registra prioridade
-      message = timestamp + ',' + esp32MAC + ',' + String(pacient) + ',' + String(priority);
-      HttpPost("/NewCall", message);
-      path = "/log.txt"; //Define caminho do arquivo
-      SaveData(path);
+    priority = button; //Registra a prioridade do chamado
+    Serial.println("PACIENT: 215A");
+    Serial.println("PRIORITY: " + String(priority));
+    Serial.println("TIMESTAMP: " + timestamp);
+    Serial.println("CLIENT MAC: " + esp32MAC);
+    Serial.println("LAMP MAC: " + lampMAC);
+    Serial.println("Sending data to Server");
+    //Concatena os dados no formato JSON
+    message = "{\"pacient\":" + String(pacient) + //Paciente que realizou a chamada
+              ",\"priority\":\"" + String(priority) + //Prioridade do chamado
+              "\",\"timestamp\":\"" + timestamp + //timestamp do chamado
+              "\",\"clientMAC\":\"" + esp32MAC + "\"}"; //endereço MAC do esp32
+    HttpPost("/NewCall", message); //Envia dados ao servidor
+  }
+}
+
+String HttpGet(String route){
+  int httpResponseCode;
+  String lampURL, response;
+  HTTPClient http;
+  
+  if(WiFi.status() == WL_CONNECTED){ //Se o WiFi estiver conectado
+    lampURL = "http://" + String(lampIP) + route;
+    http.begin(lampURL);
+    httpResponseCode = http.GET();
+    if(httpResponseCode > 0){
+      response = http.getString();
     }
-    
-    //pacient = button; //Registra o paciente que realizou a chamada
-    //message = timestamp + ',' + esp32MAC + ',' + String(pacient);
-    //HttpPost("/NewCall", message);
-    //path = "/log.txt"; //Define caminho do arquivo
-    //SaveData(path);  
-  } 
+    else{
+      Serial.println("Error: " + String(httpResponseCode));
+    }
+    http.end();
+  }
+  else{
+    Serial.println("WiFi not connected");
+  }
+
+  return response;
+}
+void HttpPost(String route, String message){
+  int httpResponseCode;
+  String lampURL, response;
+  HTTPClient http;
+  
+  if(WiFi.status() == WL_CONNECTED){
+    lampURL = "http://" + String(lampIP) + route;
+    http.begin(lampURL);
+    http.addHeader("Content-Type", "application/json"); // Definir o tipo de dado
+    httpResponseCode = http.POST(message); // Enviar a requisição POST
+    if(httpResponseCode > 0){
+      response = http.getString();
+      Serial.println("Server response: " + response);
+    }
+    else{
+      Serial.println("Error: " + String(httpResponseCode));
+    }
+    http.end();
+  }
+  else{
+    Serial.println("WiFi not connected");
+  }
+}
+
+int ButtonPressed(){ //Função 'ButtonPressed', utilizada para verificar se um botão foi pressionado
+
+  button1LastState = button1State; //Define o estado inicial do botão 1
+  button2LastState = button2State; //Define o estado inicial do botão 2
+  button3LastState = button3State; //Define o estado inicial do botão 3
+  button1State = digitalRead(BUTTON1); //Atualiza o estado atual do botão 1
+  button2State = digitalRead(BUTTON2); //Atualiza o estado atual do botão 2
+  button3State = digitalRead(BUTTON3); //Atualiza o estado atual do botão 3
+  if((button1LastState == HIGH and button1State == LOW) xor (button2LastState == HIGH and button2State == LOW) xor (button3LastState == HIGH and button3State == LOW)){ //Verifica se um botão foi pressionado
+    if(button1State == LOW){ //Se o botão 1 foi pressionado
+      return 1; //Retorna 1
+    }
+    else if(button2State == LOW){ //Se o botão 2 foi pressionado
+      return 2; //Retorna Prioridade 2
+    }
+    else{ //Se o botão 3 foi pressionado
+      return 3; //Retorna 3
+    }
+  }
+  else { //Se nenhum botão foi pressionado
+    return 0; //Retorna 0
+  }
 }
 
 String GetTime(){ //Função 'GetTime', utilizada para ler data e hora atual
@@ -166,185 +210,4 @@ String GetTime(){ //Função 'GetTime', utilizada para ler data e hora atual
     timeinfo.tm_sec); //Segundos(SS)
 
   return String(local_time); //Retorna data e hora do chamado no formato String
-}
-
-int GetPacient(){
-  // Atualiza os estados binários dos pinos
-  for(int i = 0; i < 8; i++){
-    pacientsStates[i] = digitalRead(pacients[i]);  // Leitura do estado do pino (HIGH ou LOW)
-  }
-  //Verifica qual bit está em 1
-  for(int i = 0; i < 8; i++){
-    if(pacientsStates[i] == 1){
-      return i + 1; //Retorna o índice do bit ativo
-    }
-  }
-  return 0; //Retorna 0   
-}
-
-int ButtonPressed(){ //Função para verificar se um botão foi pressionado
-  button1LastState = button1State; //Define o estado inicial do botão 1
-  button2LastState = button2State; //Define o estado inicial do botão 2
-  button3LastState = button3State; //Define o estado inicial do botão 3
-  button1State = digitalRead(BUTTON1); //Atualiza o estado atual do botão 1
-  button2State = digitalRead(BUTTON2); //Atualiza o estado atual do botão 2
-  button3State = digitalRead(BUTTON3); //Atualiza o estado atual do botão 3
-  if((button1LastState == HIGH and button1State == LOW) xor (button2LastState == HIGH and button2State == LOW) xor (button3LastState == HIGH and button3State == LOW)){ //Verifica se um botão foi pressionado
-    if(button1State == LOW){ //Se o botão 1 foi pressionado
-      return 1; //Retorna 1
-    }
-    else if(button2State == LOW){ //Se o botão 2 foi pressionado
-      return 2; //Retorna 2
-    }
-    else{ //Se o botão 3 foi pressionado
-      return 3; //Retorna 3
-    }
-  }
-  else { //Se nenhum botão foi pressionado
-    return 0; //Retorna 0
-  }
-}
-
-String HttpGet(String route){
-  int httpResponseCode;
-  String serverURL, response;
-  HTTPClient http;
-  
-  if(WiFi.status() == WL_CONNECTED){ //Se o WiFi estiver conectado
-    serverURL = "http://" + String(serverIP) + route;
-    http.begin(serverURL);
-    httpResponseCode = http.GET();
-    if(httpResponseCode > 0){
-      response = http.getString();
-    }
-    else{
-      Serial.println("Error: " + String(httpResponseCode));
-    }
-    http.end();
-  }
-  else{
-    Serial.println("WiFi not connected");
-  }
-
-  return response;
-}
-void HttpPost(String route, String message){
-  int httpResponseCode;
-  String serverURL, response;
-  HTTPClient http;
-  
-  if(WiFi.status() == WL_CONNECTED){
-    serverURL = "http://" + String(serverIP) + route;
-    http.begin(serverURL);
-    http.addHeader("Content-Type", "text/plain");
-    httpResponseCode = http.POST(message);
-    if(httpResponseCode > 0){
-      response = http.getString();
-      Serial.println("Server response: " + response);
-    }
-    else{
-      Serial.println("Error: " + String(httpResponseCode));
-    }
-    http.end();
-  }
-  else{
-    Serial.println("WiFi not connected");
-  }
-}
-  
-void SaveData(String path){
-  String message;
-  
-  if(!SPIFFS.exists(path)){ //Se o arquivo ainda não existir
-    message = "PACIENT: " + String(pacient) + '\n' + 
-              "TIMESTAMP: " + timestamp + '\n' +
-              "SERVER MAC: " + serverMAC + '\n' +
-              "CLIENT MAC: " + esp32MAC + '\n' +
-              "\r---------------------------------------\n"; //Registra os dados do chamado em 'message'          
-    if(WriteFile(path, message)){ //Se a escrita ocorrer com sucesso
-      Serial.println("------------------LOG------------------");
-      if(ReadFile(path)){ //Mostra na Serial o conteúdo do arquivo
-        Serial.println();
-      }
-    }
-  }
-  else{ //Senão
-    message = "PACIENT: " + String(pacient) + '\n' + 
-              "TIMESTAMP: " + timestamp + '\n' +
-              "SERVER MAC: " + serverMAC + '\n' +
-              "CLIENT MAC: " + esp32MAC + '\n' +
-              "\r---------------------------------------\n"; //Registra os dados do chamado em 'message'    
-    //Anexa conteúdo ao arquivo
-    if(AppendFile(path, message)){ //Se a anexação ocorreu com sucesso
-      Serial.println("--------------------LOG-------------------");
-      if(ReadFile(path)){ //Mostra na Serial o conteúdo do arquivo
-        Serial.println();
-      }
-    }
-  }  
-}
-
-bool WriteFile(String path, String message){ //Função 'WriteFile', utilizada para criar e escrever conteúdo em um arquivo
-  File file; //Arquivo a ser criado
-
-  file = SPIFFS.open(path, FILE_WRITE); //Abre o arquivo, no modo escrita, onde será gravado o conteúdo, e passa o retorno para 'file'
-  if(!file){ //Se houver falha ao abrir o caminho
-    return false; //Retorna FALSE
-  }
-  else{ //Senão
-    if(!file.print(message)){ //Se a criação e escrita do conteúdo no arquivo falhar
-      return false; //Retorna FALSE
-    }
-    else{ //Senão
-      Serial.println("Data written successfully");
-    }
-  }
-  file.close(); //Fecha o arquivo
-
-  return true; //Retorna TRUE
-}
-
-bool ReadFile(String path){ //Função 'ReadFile', utilizada para ler conteúdo de um arquivo
-  File file; //Arquivo a ser lido
-
-  file = SPIFFS.open(path); //Abre o caminho do arquivo da SPIFFS e passa o retorno para 'file'
-  if(!file){ //Se houver falha ao abrir o caminho
-    return false; //Retorna FALSE
-  }
-  else{ //Senão
-    while(file.available()){ //Enquanto houver algum byte disponível para leitura de um arquivo
-      Serial.write(file.read()); //Escreve o conteúdo do arquivo no monitor serial
-    }
-    file.close(); //Fecha o arquivo
-  }
-
-  return true; //Retorna TRUE
-}
-
-bool AppendFile(String path, String message){ //Função 'AppendFile', utilizada para anexar conteúdo a um arquivo
-  File file; //Arquivo ao qual será anexado o conteúdo
-
-  file = SPIFFS.open(path, FILE_APPEND); //Abre o arquivo, no modo anexar, onde será adicionado conteúdo, e passa o retorno para 'file'
-  if(!file){ //Se houver falha ao abrir o caminho
-    return false; //Retorna FALSE
-  }
-  else{ //Senão
-    if(!file.print(message)){ //Se a anexação do conteúdo ao arquivo der errado
-      return false; //Retorna FALSE
-    }
-    else{ //Senão
-      Serial.println("Data written successfully");
-    }
-  }
-  file.close(); //Fecha o arquivo
-
-  return true; //Retorna TRUE
-}
-
-bool FormatSPIFFS(){ //Função 'FormatSPIFFS', utilizada para formatar o sistema de arquivos SPIFFS
-  if(!SPIFFS.format()){ //Se a formatação falhar
-    return false; //Retorna FALSE
-  }
-
-  return true; //Retorna TRUE
 }
