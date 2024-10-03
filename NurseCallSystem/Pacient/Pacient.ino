@@ -36,11 +36,9 @@ const long  gmtOffset_sec = -10800;
 const int   daylightOffset_sec = 0;
 
 //Credenciais da rede
-//const char* ssid  = ""; //Nome da rede WiFi
-//const char* password  = ""; //Senha da rede WiFi
-const char* ssid  = ""; //Nome da rede WiFi
-const char* password  = ""; //Senha da rede WiFi
-const char* lampIP  = ""; //Endereço IP da lampada
+const char* ssid  = "SEVERINO_01"; //Nome da rede WiFi
+const char* password  = "a67a70l00"; //Senha da rede WiFi
+const char* lampIP  = "192.168.0.142"; //Endereço IP da lampada
 
 void setup(){
   Serial.begin(115200); //Inicialização da serial
@@ -103,14 +101,9 @@ void loop(){
   timestamp = message = "";
   button = ButtonPressed(); //Verifica se houve um chamado
   if(button == 1 || button == 2 || button == 3){ //Se houve um chamado
-    pacient = 0; //Registra em pacient o paciente que realizou o chamado
+    pacient = 1; //Registra em pacient o paciente que realizou o chamado
     timestamp = GetTime(); //Registra em 'timestamp' a data e horário do chamado
     priority = button; //Registra a prioridade do chamado
-    Serial.println("PACIENT: 215A");
-    Serial.println("PRIORITY: " + String(priority));
-    Serial.println("TIMESTAMP: " + timestamp);
-    Serial.println("CLIENT MAC: " + esp32MAC);
-    Serial.println("LAMP MAC: " + lampMAC);
     Serial.println("Sending data to Server");
     //Concatena os dados no formato JSON
     message = "{\"pacient\":" + String(pacient) + //Paciente que realizou a chamada
