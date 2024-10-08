@@ -14,18 +14,26 @@ export default function CallScreen() {
 
   const FetchData = async () => {
     try{
-      const espData = await axios.get("http://192.168.0.224:3000/data");
-      const pacientIndex = espData.data.pacient - 1; // Índice do paciente
+      const response = await axios.get("http://192.168.0.224:3000/api/data");
 
-      if((pacientIndex >= 0) && (pacientIndex <= 7)){
-        setPacientsData(prevData => {
-          const updatedData = [...prevData];
+      console.log(response.data);
+      if(response.status === 200){
+        const espData = response.data;
+        const pacientIndex = pacientsData.findIndex(pacient => pacient === null); //Índice do paciente
 
-          updatedData[pacientIndex] = espData.data;
-          Alert.alert("!!!NEW CALL!!!", `Pacient: ${espData.data.pacient}\nPriority: ${espData.data.priority}\nPlease attend!`); //Cria um alerta para nova chamada
-          
-          return updatedData; //Atualiza o paciente
-        });
+        if(pacientIndex != -1 ){
+          setPacientsData(prevData => {
+            const updatedData = [...prevData];
+
+            updatedData[pacientIndex] = espData;
+            Alert.alert("!!!NEW CALL!!!", `Pacient: ${espData.pacient}\nPriority: ${espData.priority}\n`); //ALerta de nova chamada
+            
+            return updatedData;
+          });
+        }
+      }
+      else{
+        console.log("No new calls");
       }
     }
     catch(error){
@@ -36,7 +44,9 @@ export default function CallScreen() {
   const ClearPacient = (index) => {
     setPacientsData(prevData => {
       const updatedData = [...prevData];
+      
       updatedData[index] = null; //Limpa os dados do paciente
+      
       return updatedData;
     });
   };

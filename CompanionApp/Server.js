@@ -7,21 +7,22 @@ app.use(express.json());
 let calls = []; //Lista de chamadas recebidas
 
 //rota para receber dados do esp32
-app.post("/data", (req, res) => {
-  const { pacient, priority, timestamp, serverMAC, clientMAC } = req.body; //Registra os dados
+app.post("/api/data", (req, res) => {
+  const { priority,  timestamp, pacient, serverMAC, clientMAC } = req.body; //Registra os dados
   if(!pacient || !priority || !timestamp || !serverMAC || !clientMAC){
     return res.status(400).send("Missing data");
   }
   else{
     console.log("Data Received: ");
     console.log(pacient, priority, timestamp, serverMAC, clientMAC);
-    calls.push({pacient, priority, timestamp, serverMAC, clientMAC}); //Adiciona a chamada ao final da fila
-    res.status(200).send("Data received sucessfuly!"); // Responder para o ESP32 que os dados foram recebidos
+    
+    calls.push({priority, timestamp, pacient, serverMAC, clientMAC}); //Adiciona a chamada ao final da fila
+    res.json({message: "Data received sucessfuly!"}); // Responder para o ESP32 que os dados foram recebidos
   }
 });
 
 //Rota para enviar dados para o app
-app.get("/data", (req, res) => {
+app.get("/api/data", (req, res) => {
   if(calls.length > 0){ //Se a lista Nao estiver vazia
     const call = calls.shift(); //Remove a chamada mais antiga
     res.json(call); //Retorna a chamada mais antiga
@@ -32,5 +33,5 @@ app.get("/data", (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log("Server Running");
+  console.log(`Server running on port ${port}`);
 });
