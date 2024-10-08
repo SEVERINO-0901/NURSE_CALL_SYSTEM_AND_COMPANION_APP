@@ -12,9 +12,9 @@ import axios from "axios";
 export default function CallScreen() {
   const [pacientsData, setPacientsData] = useState([null, null, null, null, null, null, null, null]);
 
-  const FetchData = async () => {
+  const FetchDataFromEsp32 = async () => {
     try{
-      const response = await axios.get("http://192.168.0.224:3000/api/data");
+      const response = await axios.get("http://192.168.0.224:3000/getCalls");
 
       console.log(response.data);
       if(response.status === 200){
@@ -42,6 +42,7 @@ export default function CallScreen() {
   };
 
   const ClearPacient = (index) => {
+    sendDataToEsp32();
     setPacientsData(prevData => {
       const updatedData = [...prevData];
       
@@ -64,9 +65,26 @@ export default function CallScreen() {
       });
   };
 
+  const sendDataToEsp32 = async() => {
+    try{
+      const response = await fetch("http://192.168.0.224:3000/sendOff", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'data=OFF' //Envio dos dados  
+      });
+      const result = await response.text();
+      console.log(result);
+    }
+    catch(error){
+      console.log("Error: ", error);
+    }  
+  };
+
   useEffect(() => {
-    FetchData();
-    const interval = setInterval(FetchData, 1000);
+    FetchDataFromEsp32();
+    const interval = setInterval(FetchDataFromEsp32, 1000);
     return () => clearInterval(interval);
   }, []);
   
@@ -90,7 +108,7 @@ export default function CallScreen() {
                     <Button
                       title = "OK"
                       color = "midnightblue"
-                      onPress = {() => ClearPacient(data.pacient - 1)}
+                      onPress = {() => ClearPacient(index)}
                     />
                   </>
                 )}
