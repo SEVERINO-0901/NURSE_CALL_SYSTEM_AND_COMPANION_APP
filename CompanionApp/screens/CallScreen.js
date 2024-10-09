@@ -41,8 +41,8 @@ export default function CallScreen() {
     }  
   };
 
-  const ClearPacient = (index) => {
-    sendDataToEsp32();
+  const ClearPacient = (index, ip) => {
+    sendDataToEsp32(ip);
     setPacientsData(prevData => {
       const updatedData = [...prevData];
       
@@ -65,14 +65,14 @@ export default function CallScreen() {
       });
   };
 
-  const sendDataToEsp32 = async() => {
+  const sendDataToEsp32 = async(ip) => {
     try{
       const response = await fetch("http://192.168.0.224:3000/sendOff", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
-        body: 'data=OFF' //Envio dos dados  
+        body: `data=${encodeURIComponent(ip)}` //Envio do IP do esp32 que deve ser desligado  
       });
       const result = await response.text();
       console.log(result);
@@ -108,7 +108,7 @@ export default function CallScreen() {
                     <Button
                       title = "OK"
                       color = "midnightblue"
-                      onPress = {() => ClearPacient(index)}
+                      onPress = {() => ClearPacient(index, data.lampIP)}
                     />
                   </>
                 )}

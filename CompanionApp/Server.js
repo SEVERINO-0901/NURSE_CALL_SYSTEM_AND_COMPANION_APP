@@ -16,15 +16,15 @@ let calls = []; //Lista de chamadas recebidas
 //Rotas POST
 //rota para receber dados do esp32
 app.post("/sendCall", (req, res) => {
-  const { priority,  timestamp, pacient, serverMAC, clientMAC } = req.body; //Registra os dados
-  if(!pacient || !priority || !timestamp || !serverMAC || !clientMAC){
+  const { priority,  timestamp, pacient, serverMAC, clientMAC, lampIP } = req.body; //Registra os dados
+  if(!pacient || !priority || !timestamp || !serverMAC || !clientMAC || !lampIP){
     return res.status(400).send("Missing data");
   }
   else{
     console.log("Data Received: ");
-    console.log(pacient, priority, timestamp, serverMAC, clientMAC);
+    console.log(priority,  timestamp, pacient, serverMAC, clientMAC, lampIP);
     
-    calls.push({priority, timestamp, pacient, serverMAC, clientMAC}); //Adiciona a chamada ao final da fila
+    calls.push({priority, timestamp, pacient, serverMAC, clientMAC, lampIP}); //Adiciona a chamada ao final da fila
     res.json({message: "Data received sucessfuly!"}); // Responder para o ESP32 que os dados foram recebidos
   }
 });
@@ -33,12 +33,15 @@ app.post("/sendOff", (req, res) => {
   if(req.body.data){
     console.log("received data from RN:", req.body.data);
     res.status(200).send("Data received");
-    sendDataToESP32();
+    sendDataToESP32(req.body.data);
+  }
+  else{
+    res.status(400).send("No data received");  
   }
 });
-async function sendDataToESP32() {
+async function sendDataToESP32(ip) {
   try{
-    const response = await axios.post('http://192.168.0.142/receiveOff')
+    const response = await axios.post(`http://${ip}/receiveOff`)
     console.log("Sending OFF to esp32");
   }
   catch(error){
