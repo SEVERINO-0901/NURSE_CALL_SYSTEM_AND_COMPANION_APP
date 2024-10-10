@@ -13,42 +13,58 @@ export default function CallScreen() {
   const [pacientsData, setPacientsData] = useState([null, null, null, null, null, null, null, null]);
 
   const FetchDataFromEsp32 = async () => {
-    try{
-      const response = await axios.get("http://192.168.0.224:3000/getCalls");
-
+    try {
+      const response = await axios.get("http://192.168.0.225:3000/getCalls");
+  
       console.log(response.data);
-      if(response.status === 200){
+      if (response.status === 200) {
         const espData = response.data;
-        const pacientIndex = pacientsData.findIndex(pacient => pacient === null); //Índice do paciente
-
-        if(pacientIndex != -1 ){
-          setPacientsData(prevData => {
-            const updatedData = [...prevData];
-
+        
+        // Atualiza o estado garantindo uma chamada por paciente (clientMAC como chave)
+        setPacientsData(prevData => {
+          // Encontra se o paciente já está presente na lista
+          const updatedData = [...prevData];
+          const pacientIndex = updatedData.findIndex(pacient => pacient && pacient.clientMAC === espData.clientMAC);
+          
+          if (pacientIndex !== -1) {
+            // Substitui a chamada existente para o mesmo paciente
             updatedData[pacientIndex] = espData;
-            Alert.alert("!!!NEW CALL!!!", `Pacient: ${espData.pacient}\nPriority: ${espData.priority}\n`); //ALerta de nova chamada
-            
-            return updatedData;
-          });
-        }
-      }
-      else{
+          } else {
+            // Se não houver chamada para o paciente, encontra o primeiro índice null para adicionar a nova chamada
+            const firstNullIndex = updatedData.findIndex(pacient => pacient === null);
+            if (firstNullIndex !== -1) {
+              updatedData[firstNullIndex] = espData;
+            } else {
+              // Se não houver espaço, adiciona ao final da lista
+              updatedData.push(espData);
+            }
+          }
+  
+          Alert.alert("!!!NEW CALL!!!", `Pacient: ${espData.pacient}\nPriority: ${espData.priority}\n`);
+          return updatedData;
+        });
+      } else {
         console.log("No new calls");
       }
-    }
-    catch(error){
+    } catch (error) {
       console.log("Error: ", error);
-    }  
+    }
   };
 
   const ClearPacient = (index, ip) => {
     sendDataToEsp32(ip);
     setPacientsData(prevData => {
       const updatedData = [...prevData];
-      
-      updatedData[index] = null; //Limpa os dados do paciente
-      
-      return updatedData;
+  
+      if (updatedData[index] !== null) {
+        updatedData[index] = null; // Limpa os dados do paciente
+      }
+  
+      // Filtra quaisquer valores 'null' ou inválidos que possam ter sobrado
+      const cleanedData = updatedData.filter(pacient => pacient !== null);
+  
+      console.log('Pacients after clear:', cleanedData);
+      return cleanedData;
     });
   };
 
@@ -67,7 +83,7 @@ export default function CallScreen() {
 
   const sendDataToEsp32 = async(ip) => {
     try{
-      const response = await fetch("http://192.168.0.224:3000/sendOff", {
+      const response = await fetch("http://192.168.0.225:3000/sendOff", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
@@ -86,7 +102,7 @@ export default function CallScreen() {
     FetchDataFromEsp32();
     const interval = setInterval(FetchDataFromEsp32, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [pacientsData]);
   
   const sortedPacients = sortPacients(pacientsData);
 
@@ -97,6 +113,7 @@ export default function CallScreen() {
           <View 
             key = {index} 
             style = {styles.callContainer}>
+            {console.log('Rendering Pacient:', data)}
             <View style = {styles.pacientContainer}>
               <Text style = {styles.pacientTextStyle}>Paciente {data.pacient}</Text>
               <View style = {styles.infoContainer}>
@@ -115,7 +132,6 @@ export default function CallScreen() {
               </View>
               <View style = {styles.ledContainer}>
                 {data ? (
-                  //Altera a cor do LED com base na prioridade do chamado
                   <View 
                     style = {[
                       styles.activeLed,
@@ -123,7 +139,6 @@ export default function CallScreen() {
                       data.priority === 2 && styles.yellowLed,
                       data.priority === 3 && styles.redLed,
                     ]} 
-                  
                   />
                 ) : (
                   <View style = {styles.inactiveLed} />

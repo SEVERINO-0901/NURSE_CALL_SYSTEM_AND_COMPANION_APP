@@ -23,7 +23,6 @@ app.post("/sendCall", (req, res) => {
   else{
     console.log("Data Received: ");
     console.log(priority,  timestamp, pacient, serverMAC, clientMAC, lampIP);
-    
     calls.push({priority, timestamp, pacient, serverMAC, clientMAC, lampIP}); //Adiciona a chamada ao final da fila
     res.json({message: "Data received sucessfuly!"}); // Responder para o ESP32 que os dados foram recebidos
   }
