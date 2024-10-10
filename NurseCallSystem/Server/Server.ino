@@ -13,7 +13,7 @@ retornando uma resposta ao paciente. Então, ele envia os dados para a aplicaç�
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 #include <FS.h>
-//#include <HTTPClient.h>
+#include <HTTPClient.h>
 
 //Pinos da placa
 #define LED 2 //Pino do Led da placa
@@ -23,15 +23,14 @@ retornando uma resposta ao paciente. Então, ele envia os dados para a aplicaç�
 
 //Protótipo das funções
 void HandleSalute();
-void HandleMacAddress();
 void HandleCall();
 void TurnLedOn(int priority);
 void SaveData(String pacient, String timestamp, String clientMAC, String serverMAC);
 bool ReadFile(String path);
 bool WriteFile(String path, String message);
 bool AppendFile(String path, String message);
-//void SendDataToApp(String pacient, String priority, String timestamp, String serverMAC, String clientMAC);
-
+void SendData(String pacient, int priority, String timestamp, String serverMAC, String clientMAC);
+void ReceiveData();
 
 //Variavéis globais
 String esp32MAC; //Endereço MAC do esp32
@@ -40,8 +39,7 @@ int currentPriority; //Prioridade atual
 //Credenciais da rede
 const char* ssid; //Nome da rede WiFi
 const char* password; //Senha da rede WiFi
-const char* serverUrl = ""; //URL do servidor
-//const char* serverUrl = "http://192.168.0.224:3000/data"; //URL do servidor
+const char* serverURL; //URL do servidor
 WebServer server(80);  // Servidor rodando na porta 80
 
 void setup(){
@@ -56,6 +54,7 @@ void setup(){
   esp32MAC = "";
   ssid  = "SEVERINO_01"; //Inicializa nome da rede
   password  = "a67a70l00"; //Inicializa senha da rede
+  serverURL = "http://192.168.0.225:3000"; //Inicializa URL do servidor
   //Conexão na rede WiFi
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -74,10 +73,10 @@ void setup(){
   Serial.println("MAC Address: " + esp32MAC);
   //Rota que responde uma saudacao com um "Oi"
   server.on("/Salute", HTTP_GET, HandleSalute);
-  //Rota para obter o endereço MAC do servidor
-  server.on("/MacAddress", HTTP_GET, HandleMacAddress);
   //Rota para realizar uma chamada
   server.on("/NewCall", HTTP_POST, HandleCall);
+  //Rota para receber dados 
+  server.on("/receiveOff", HTTP_POST, ReceiveData);
   //Inicialização da partição SPIFFS sem formatar
   if(SPIFFS.begin(false)){ //Se a inicialização ocorreu com sucesso
     Serial.println("SPIFFS initialized!");
@@ -104,11 +103,6 @@ void HandleSalute(){ // Função que responde à rota GET /Salute
   server.send(200, "text/plain", "Hello!");  
 }
 
-void HandleMacAddress(){ // Função que responde à rota GET /MacAddress
-  Serial.println("Returning: MAC address");
-  server.send(200, "text/plain", esp32MAC); 
-}
-
 void HandleCall(){ // Função 'HandleCall', que lida com a requisição POST
   String message, payload;
   StaticJsonDocument<200> doc; //Parse do JSON recebido
@@ -119,7 +113,7 @@ void HandleCall(){ // Função 'HandleCall', que lida com a requisição POST
   //Inicializa variavéis internas
   priority = 0;
   message = payload = timestamp = clientMAC = "";
-  pacient = "215"; //Quarto onde o paciente está localizado
+  pacient = ""; //Quarto onde o paciente está localizado
   if(server.hasArg("plain")){ //Verifica se há dados na requisição
     message = server.arg("plain"); //Registra os dados da requisição
     Serial.println("Data received: " + message);
@@ -139,6 +133,8 @@ void HandleCall(){ // Função 'HandleCall', que lida com a requisição POST
     Serial.println("!NEW CALL!");
     Serial.print("Turning ON ");
     TurnLedOn(priority); //Ativa o LED correspondente
+    Serial.println("Sending data to app");
+    SendData(pacient, priority, timestamp, esp32MAC, clientMAC); //Envia conteúdo ao App
     Serial.println("Saving data");
     SaveData(pacient, timestamp, clientMAC, esp32MAC, "/log.txt"); //Salva conteúdo no arquivo
     }
@@ -266,32 +262,39 @@ bool AppendFile(String path, String message){ //Função para anexar conteúdo a
   return true; //Retorna TRUE
 }
 
-/*
-void SendDataToApp(String pacient, String priority, String timestamp, String serverMAC, String clientMAC){
+void SendData(String pacient, int priority, String timestamp, String serverMAC, String clientMAC){
   HTTPClient http;
-  String payload;
   int httpResponseCode;
-  String response;
-  
-  if(WiFi.status() == WL_CONNECTED){ //Se estiver conectado ao WiFi
-    http.begin(serverUrl); //Conecta ao servidor
-    http.addHeader("Content-Type", "application/json"); //Adiciona o cabeçalho
-    // Criar o JSON a ser enviado
-    payload = "{";
-    payload += "\"pacient\":" + pacient + ",";
-    payload += "\"priority\":" + priority + ",";
-    payload += "\"timestamp\":\"" + timestamp + "\",";
-    payload += "\"serverMAC\":\"" + serverMAC + "\",";
-    payload += "\"clientMAC\":\"" + clientMAC + "\"";
-    payload += "}";
-    httpResponseCode = http.POST(payload); // Enviar a solicitação POST
+  String message, response, route, localIP;
+ 
+  route = "/sendCall";
+  if(WiFi.status() == WL_CONNECTED){
+    http.begin(serverURL + route);
+    http.addHeader("Content-Type", "application/json");
+    localIP = WiFi.localIP().toString();
+    message = "{\"priority\":" + String(priority) + 
+              ",\"timestamp\":\"" + timestamp + 
+              "\",\"pacient\":\"" + pacient +
+              "\",\"serverMAC\":\"" + serverMAC + 
+              "\",\"clientMAC\":\"" + clientMAC + 
+              "\",\"lampIP\":\"" + localIP + "\"}";    
+    httpResponseCode = http.POST(message);
     if(httpResponseCode > 0){
-      response = http.getString();
-      Serial.println("Server response: " + response);
+      Serial.println("Data send sucessfuly!");
     }
     else{
-      Serial.println("Error: " + String(httpResponseCode));
+      Serial.print("Error: ");
+      Serial.println(httpResponseCode);
     }
-    http.end();
-  }  
-}*/
+    http.end();  // Fecha a conexão HTTP
+  }
+}
+
+void ReceiveData(){
+  Serial.println("TURNING OFF LEDS");
+  digitalWrite(LED1, LOW); //Apaga LED 1
+  digitalWrite(LED2, LOW); //Apaga LED 2
+  digitalWrite(LED3, LOW); //Apaga LED 3
+  currentPriority = 0; //Atualiza a prioridade
+  server.send(200, "text/plain", "Data received");
+}

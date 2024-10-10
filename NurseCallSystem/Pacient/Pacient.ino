@@ -11,8 +11,6 @@ timestamp do chamado.
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <time.h>
-#include <SPIFFS.h>
-#include <FS.h>
 
 //Pinos da placa
 #define BUTTON1 18 //Pino do botão 1
@@ -36,9 +34,9 @@ const long  gmtOffset_sec = -10800;
 const int   daylightOffset_sec = 0;
 
 //Credenciais da rede
-const char* ssid  = "SEVERINO_01"; //Nome da rede WiFi
-const char* password  = "a67a70l00"; //Senha da rede WiFi
-const char* lampIP  = "192.168.0.142"; //Endereço IP da lampada
+const char* ssid; //Nome da rede WiFi
+const char* password; //Senha da rede WiFi
+const char* lampIP; //Endereço IP da lampada
 
 void setup(){
   Serial.begin(115200); //Inicialização da serial
@@ -50,18 +48,13 @@ void setup(){
   pinMode(LED, OUTPUT);
   //Inicializa variavéis globais
   esp32MAC = lampMAC = "";
+  ssid  = "SEVERINO_01"; //Inicializa nome da rede WiFi
+  password  = "a67a70l00"; //Inicializa senha da rede WiFi
+  lampIP  = "192.168.0.142"; //Inicializa endereço IP da lampada
   button1State = digitalRead(BUTTON1); //Inicializa estado do botão 1
   button2State = digitalRead(BUTTON2); //Inicializa estado do botão 2
   button3State = digitalRead(BUTTON3); //Inicializa estado do botão 3
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); //Incializa DATA e HORA
-  //Inicialização da partição SPIFFS
-  if(SPIFFS.begin(false)){ //Se a inicialização ocorreu com sucesso
-    Serial.println("SPIFFS initialized!");
-  }
-  else{ //Senão
-    Serial.println("Fail do initialize SPIFFS");
-    while (1); //Loop infinito
-  }
   //Conexão na rede WiFi
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -81,10 +74,6 @@ void setup(){
   // Realizar a requisição HTTP para o servidor
   Serial.println("Sending: Hello!");
   Serial.println("Server response: " + HttpGet("/Salute"));
-  //Solicitar o endereço MAC do servidor
-  Serial.println("Requesting MAC address");
-  lampMAC = HttpGet("/MacAddress");
-  Serial.println("Server response: " + lampMAC);
   //Se tudo tiver dado certo, liga o LED da placa
   digitalWrite(LED, HIGH);
 }
