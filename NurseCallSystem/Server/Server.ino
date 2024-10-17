@@ -24,17 +24,20 @@ retornando uma resposta ao paciente. Então, ele envia os dados para a aplicaç�
 //Protótipo das funções
 void HandleSalute();
 void HandleCall();
-void TurnLedOn(int priority);
+void ReceiveOff();
+void updateLED();
+void TurnLedOn(int led);
+void TurnLedsOff();
+void SendData(String pacient, int priority, String timestamp, String serverMAC, String clientMAC);
 void SaveData(String pacient, String timestamp, String clientMAC, String serverMAC);
 bool ReadFile(String path);
 bool WriteFile(String path, String message);
 bool AppendFile(String path, String message);
-void SendData(String pacient, int priority, String timestamp, String serverMAC, String clientMAC);
-void ReceiveData();
 
 //Variavéis globais
 String esp32MAC; //Endereço MAC do esp32
-int currentPriority; //Prioridade atual
+int priorityA, priorityB;
+bool pacient1Active, pacient2Active; 
 
 //Credenciais da rede
 const char* ssid; //Nome da rede WiFi
@@ -50,11 +53,12 @@ void setup(){
   pinMode(LED2, OUTPUT);
   pinMode(LED3, OUTPUT);
   //Inicializa variavéis globais
-  currentPriority = 0;
   esp32MAC = "";
   ssid  = "SEVERINO_01"; //Inicializa nome da rede
   password  = "a67a70l00"; //Inicializa senha da rede
   serverURL = "http://192.168.0.225:3000"; //Inicializa URL do servidor
+  priorityA = priorityB = 0;
+  pacient1Active = pacient2Active = false;
   //Conexão na rede WiFi
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -76,7 +80,7 @@ void setup(){
   //Rota para realizar uma chamada
   server.on("/NewCall", HTTP_POST, HandleCall);
   //Rota para receber dados 
-  server.on("/receiveOff", HTTP_POST, ReceiveData);
+  server.on("/receiveOff", HTTP_POST, ReceiveOff);
   //Inicialização da partição SPIFFS sem formatar
   if(SPIFFS.begin(false)){ //Se a inicialização ocorreu com sucesso
     Serial.println("SPIFFS initialized!");
@@ -112,31 +116,34 @@ void HandleCall(){ // Função 'HandleCall', que lida com a requisição POST
 
   //Inicializa variavéis internas
   priority = 0;
-  message = payload = timestamp = clientMAC = "";
   pacient = ""; //Quarto onde o paciente está localizado
+  message = payload = timestamp = clientMAC = "";
   if(server.hasArg("plain")){ //Verifica se há dados na requisição
     message = server.arg("plain"); //Registra os dados da requisição
     Serial.println("Data received: " + message);
     error = deserializeJson(doc, message);
     if(!error){
-    //Extrair e armazenar os dados nas variavéis
-    if(doc["pacient"] == 1){ //Se o Paciente 1 realizou a requisição
-      pacient += 'A';    
-    }
-    else if(doc["pacient"] == 2){ //Se o Paciente 2 realizou a requisição
-      pacient += 'B';
-    }
-    priority = doc["priority"];
-    timestamp = doc["timestamp"].as<String>();
-    clientMAC = doc["clientMAC"].as<String>();
-    server.send(200, "application/json", "{\"Data received sucessfuly!\"}"); // Enviar resposta ao cliente     
-    Serial.println("!NEW CALL!");
-    Serial.print("Turning ON ");
-    TurnLedOn(priority); //Ativa o LED correspondente
-    Serial.println("Sending data to app");
-    SendData(pacient, priority, timestamp, esp32MAC, clientMAC); //Envia conteúdo ao App
-    Serial.println("Saving data");
-    SaveData(pacient, timestamp, clientMAC, esp32MAC, "/log.txt"); //Salva conteúdo no arquivo
+      //Extrair e armazenar os dados nas variavéis
+      priority = doc["priority"];
+      if(doc["pacient"] == 1){ //Se o Paciente 1 realizou a requisição
+        pacient += 'A';
+        priorityA = priority;
+        pacient1Active = true;     
+      }
+      else if(doc["pacient"] == 2){ //Se o Paciente 2 realizou a requisição
+        pacient += 'B';
+        priorityB = priority;
+        pacient2Active = true;
+      }
+      timestamp = doc["timestamp"].as<String>();
+      clientMAC = doc["clientMAC"].as<String>();
+      server.send(200, "application/json", "{\"Data received sucessfuly!\"}"); // Enviar resposta ao cliente     
+      Serial.println("!NEW CALL!");
+      updateLed();
+      Serial.println("Sending data to app");
+      SendData(pacient, priority, timestamp, esp32MAC, clientMAC); //Envia conteúdo ao App
+      Serial.println("Saving data");
+      SaveData(pacient, timestamp, clientMAC, esp32MAC, "/log.txt"); //Salva conteúdo no arquivo
     }
     else{
       Serial.println("Error!");
@@ -148,28 +155,71 @@ void HandleCall(){ // Função 'HandleCall', que lida com a requisição POST
   }
 }
 
-void TurnLedOn(int priority){ //Função 'TurnLedOn', utilizada para ligar os LEDs
-  if(priority > currentPriority){
-    if(priority == 1){
-      Serial.println("LED 1");
-      digitalWrite(LED1, HIGH); //Acende LED 1
-      digitalWrite(LED2, LOW); //Apaga LED 2
-      digitalWrite(LED3, LOW); //Apaga LED 3
+void ReceiveOff(){
+  String pacient;
+  
+  if(server.hasArg("pacient")){
+    pacient = server.arg("pacient");
+    if(pacient == "A"){
+      pacient1Active = false;  
     }
-    else if(priority == 2){
-      Serial.println("LED 2");
-      digitalWrite(LED2, HIGH); //Acende LED 2
-      digitalWrite(LED1, LOW); //Apaga LED 1
-      digitalWrite(LED3, LOW); //Apaga LED 3  
+    else if(pacient == "B"){
+      pacient2Active = false;  
     }
-    else if(priority == 3){
-      Serial.println("LED 3");
-      digitalWrite(LED3, HIGH); //Acende LED 3
-      digitalWrite(LED1, LOW); //Apaga LED 1
-      digitalWrite(LED2, LOW); //Apaga LED 2     
-    }
-    currentPriority = priority; //Atualiza a prioridade
+    updateLED();
+    server.send(200, "text/plain", "Data received");
   }
+  else{
+    server.send(400, "text/plain", "No pacient provided");  
+  }
+}
+
+void updateLED(){
+  if(pacient1Active == false && pacient2Active == false){
+    TurnLedsOff();  
+  }
+  else{
+    if(pacient1Active == true && pacient2Active == true){
+      if(priorityA > priorityB){
+        TurnLedOn(priorityA);      
+      }
+      else if(priorityB > priorityA){
+        TurnLedOn(priorityB);  
+      }
+      else{
+        TurnLedOn(priorityA);
+        TurnLedOn(priorityB);    
+      }
+    }
+    else if(pacient1Active == true && pacient2Active == false){
+      TurnLedOn(priorityA);  
+    }
+    else{
+      TurnLedOn(priorityB);  
+    }
+  }
+}
+
+void TurnLedOn(int led){ //Função 'TurnLedOn', utilizada para ligar os LEDs
+    TurnLedsOff();
+    if(led == 1){
+      Serial.println("Turning ON LED 1");
+      digitalWrite(LED1, HIGH); //Acende LED 1
+    }
+    else if(led == 2){
+      Serial.println("Turning ON LED 2");
+      digitalWrite(LED2, HIGH); //Acende LED 2  
+    }
+    else if(led == 3){
+      Serial.println("Turning ON LED 3");
+      digitalWrite(LED3, HIGH); //Acende LED 3     
+    }
+}
+
+void TurnLedsOff(){ //Função 'TurnLedOn', utilizada para desligar os LEDs
+  digitalWrite(LED1, LOW); //Apaga LED 1
+  digitalWrite(LED2, LOW); //Apaga LED 2  
+  digitalWrite(LED3, LOW); //Apaga LED 3     
 }
 
 void SaveData(String pacient, String timestamp, String clientMAC, String serverMAC, String path){
@@ -288,13 +338,4 @@ void SendData(String pacient, int priority, String timestamp, String serverMAC, 
     }
     http.end();  // Fecha a conexão HTTP
   }
-}
-
-void ReceiveData(){
-  Serial.println("TURNING OFF LEDS");
-  digitalWrite(LED1, LOW); //Apaga LED 1
-  digitalWrite(LED2, LOW); //Apaga LED 2
-  digitalWrite(LED3, LOW); //Apaga LED 3
-  currentPriority = 0; //Atualiza a prioridade
-  server.send(200, "text/plain", "Data received");
 }
