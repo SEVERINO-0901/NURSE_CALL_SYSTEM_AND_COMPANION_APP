@@ -18,6 +18,7 @@
   - Companion App: Programa em React Native que implementa um aplicativo para que o usuário possa interagir com o sistema, iniciando o servidor para o qual serão enviados os dados dos chamados, exibindo os dados dos mesmos e permitindo respondê-los com o pressionar de um botão;
 
 ## DEMONSTRAÇÃO
+![f1](https://github.com/user-attachments/assets/660a9e18-a438-411e-acff-f00ee20094af)
 ![f2](https://github.com/user-attachments/assets/ede7f88a-6f5e-4850-a8bd-72c0960a18a9)
 ![f3](https://github.com/user-attachments/assets/24b5ba4d-62e5-49ac-87af-3e3871e4fc6e)
 ![f4](https://github.com/user-attachments/assets/be2df8e7-983b-4750-92e8-b00a948902d5)
