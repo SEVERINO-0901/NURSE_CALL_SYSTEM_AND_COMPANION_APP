@@ -15,4 +15,13 @@
 - **Funcionalidades:**
   - ESP32-Pacient: Programa em Arduino que realiza chamadas de pacientes, utilizando os botões para enviar um chamado com uma determinada prioridade para o atendimento.Inicialmente, o ESP32 conecta-se a uma rede WiFi e, caso a conexão tenha sucesso, lê-se o endereço MAC do ESP32 e realiza-se o primeiro contato com a lampada correspondente ao quarto do paciente para o qual será enviado os dados do paciente que acionou o chamado, para que esta acenda o Led correspondente e envie ao servidor as informações do chamado. As informações incluem o endereço MAC do ESP32, o leito correspondente ao paciente, o timestamp e a prioridade do chamado;
   - ESP32-Lamp: Programa em Arduino que recebe e processa as chamadas de pacientes, ativando os Leds e transmitindo as informações ao servidor que enviará as informações ao aplicativo integrado. Quando um paciente realiza um chamado, ele registra em um arquivo os dados recebidos de timestamp, endereço MAC do cliente, ID do paciente que realizou a chamada e prioridade do chamado. Então, ele envia os dados para a aplicação em React native e aguarda que o usuário responda através desta, desativando e/ou ativando os Leds de acordo;
-  - Companion App: Programa em React Native que implementa um aplicativo para que o usuário possa interagir com o sistema, iniciando o servidor para o qual serão enviados os dados dos chamados, exibindo os dados dos mesmos e permitindo respondê-los com o pressionar de um botão;   
+  - Companion App: Programa em React Native que implementa um aplicativo para que o usuário possa interagir com o sistema, iniciando o servidor para o qual serão enviados os dados dos chamados, exibindo os dados dos mesmos e permitindo respondê-los com o pressionar de um botão;
+
+## DEMONSTRAÇÃO
+![f1](https://github.com/user-attachments/assets/ed5c75f3-ff59-4344-9802-339161b5edc5)
+![f2](https://github.com/user-attachments/assets/ede7f88a-6f5e-4850-a8bd-72c0960a18a9)
+![f3](https://github.com/user-attachments/assets/24b5ba4d-62e5-49ac-87af-3e3871e4fc6e)
+![f4](https://github.com/user-attachments/assets/be2df8e7-983b-4750-92e8-b00a948902d5)
+![f5](https://github.com/user-attachments/assets/eada6232-692e-4ffe-a067-341db416500a)
+![f6](https://github.com/user-attachments/assets/d1d79b5c-01d4-47b8-a5d4-38717f0daf4a)
+![f7](https://github.com/user-attachments/assets/53719ca1-63bd-4bfa-8fae-d374a7476a21)
