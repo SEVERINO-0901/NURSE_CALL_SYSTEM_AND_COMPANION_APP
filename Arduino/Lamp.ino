@@ -24,7 +24,7 @@ endereço MAC do cliente, ID do paciente que realizou a chamada e prioridade do 
 void HandleSalute();
 void HandleCall();
 void ReceiveOff();
-void updateLED();
+void UpdateLed();
 void TurnLedOn(int led);
 void TurnLedsOff();
 void SendData(String pacient, int priority, String timestamp, String serverMAC, String clientMAC);
@@ -140,7 +140,7 @@ void HandleCall(){ //Função 'HandleCall', que lida com a requisição POST
       clientMAC = doc["clientMAC"].as<String>(); //Registra o endereço MAC do cliente em 'clientMAC'
       server.send(200, "application/json", "{\"Data received sucessfuly!\"}"); // Enviar resposta ao cliente     
       Serial.println("!NEW CALL!");
-      updateLed(); //Atualiza os Leds
+      UpdateLed(); //Atualiza os Leds
       Serial.println("Sending data to app");
       SendData(pacient, priority, timestamp, esp32MAC, clientMAC); //Envia conteúdo ao App
       Serial.println("Saving data");
@@ -175,7 +175,7 @@ void ReceiveOff(){ //Função 'ReceiveOff', que recebe uma requisição para des
   }
 }
 
-void updateLED(){ //Função 'updateLED', que atualiza qual Led ficará ativo
+void UpdateLed(){ //Função 'updateLED', que atualiza qual Led ficará ativo
   if(pacient1Active == false && pacient2Active == false){ //Se nenhum paciente tiver um chamado ativo
     TurnLedsOff(); //Desliga todos os Leds  
   }
