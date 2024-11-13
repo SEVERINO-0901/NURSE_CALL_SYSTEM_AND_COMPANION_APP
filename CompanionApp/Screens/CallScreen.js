@@ -1,4 +1,8 @@
-import React, { useState, useEffect } from "react";
+//Importação dos componentes
+import React, { 
+  useState, 
+  useEffect 
+} from "react";
 import { 
     StyleSheet, 
     Text, 
@@ -9,67 +13,69 @@ import {
 } from "react-native";
 import axios from "axios";
 
-export default function CallScreen() {
-  const [pacientsData, setPacientsData] = useState([null, null, null, null, null, null, null, null]);
+export default function CallScreen(){ //Função 'CallScreen', que implementa a tela de recepção de chamados
+  const [pacientsData, setPacientsData] = useState([null]); //Dados das chamadas(configurar para quantos pacientes forem necessários)
+  const sortedPacients = sortPacients(pacientsData); //Lista de pacientes ordenada
+  let serverIP = ""; //Ip do servidor
+  let serverPort = 3000; //Porta do servidor
 
-  const FetchDataFromEsp32 = async () => {
-    try {
-      const response = await axios.get("http://192.168.0.225:3000/getCalls");
+
+  const FetchDataFromEsp32 = async () => { //Função 'FetchDataFromEsp32', que recebe dados do esp32
+    try{
+      const response = await axios.get(`http://${serverIP}:${serverPort}/getCalls`); //Rota para receber dados
   
       console.log(response.data);
-      if (response.status === 200) {
-        const espData = response.data;
+      if(response.status === 200){ //Se recebeu dados
+        const espData = response.data; //Registra os dados da chamada em 'espData'
         
-        // Atualiza o estado garantindo uma chamada por paciente (clientMAC como chave)
+        //Atualiza o estado garantindo uma chamada por paciente(clientMAC como chave)
         setPacientsData(prevData => {
           // Encontra se o paciente já está presente na lista
           const updatedData = [...prevData];
           const pacientIndex = updatedData.findIndex(pacient => pacient && pacient.clientMAC === espData.clientMAC);
           
-          if (pacientIndex !== -1) {
-            // Substitui a chamada existente para o mesmo paciente
-            updatedData[pacientIndex] = espData;
-          } else {
-            // Se não houver chamada para o paciente, encontra o primeiro índice null para adicionar a nova chamada
-            const firstNullIndex = updatedData.findIndex(pacient => pacient === null);
-            if (firstNullIndex !== -1) {
-              updatedData[firstNullIndex] = espData;
-            } else {
-              // Se não houver espaço, adiciona ao final da lista
-              updatedData.push(espData);
+          if(pacientIndex !== -1){ //Se o paciente já está na lista de chamados
+            updatedData[pacientIndex] = espData; //Atualiza a chamada existente
+          }
+          else{//Se não houver chamada para o paciente 
+            const firstNullIndex = updatedData.findIndex(pacient => pacient === null); //encontra o primeiro índice null para adicionar a nova chamada
+
+            if(firstNullIndex !== -1){ //Se o índice for válido
+              updatedData[firstNullIndex] = espData; //Atualiza a lista de chamados
+            }
+            else{ //Se não houver espaço
+              updatedData.push(espData); //Adiciona ao final da lista
             }
           }
-  
-          Alert.alert("!!!NEW CALL!!!", `Pacient: ${espData.pacient}\nPriority: ${espData.priority}\n`);
-          return updatedData;
+          Alert.alert("!!!NEW CALL!!!", `Pacient: ${espData.pacient}\nPriority: ${espData.priority}\n`); //Exibe o alerta de nova chamada
+
+          return updatedData; //Retorna a lista de chamadas ativas
         });
-      } else {
-        console.log("No new calls");
       }
-    } catch (error) {
-      console.log("Error: ", error);
+    }
+    catch(error){
+      console.log("Error: ", error); //Exibe erros(se houver)
     }
   };
 
-  const ClearPacient = (index, pacient, ip) => {
-    sendDataToEsp32(pacient, ip);
-    setPacientsData(prevData => {
-      const updatedData = [...prevData];
+  const ClearPacient = (index, pacient, ip) => { //Função 'ClearPacient', utilizada para remover um chamado da lista de chamadas ativas
+    sendDataToEsp32(pacient, ip); //Envia os dados para o esp32
+    setPacientsData(prevData => { //Atualiza a lista de chamados ativos
+      const updatedData = [...prevData]; //Dados atualizados
   
-      if (updatedData[index] !== null) {
-        updatedData[index] = null; // Limpa os dados do paciente
+      if(updatedData[index] !== null){ //Se o indíce não for nulo
+        updatedData[index] = null; //Limpa os dados do paciente
       }
   
       // Filtra quaisquer valores 'null' ou inválidos que possam ter sobrado
       const cleanedData = updatedData.filter(pacient => pacient !== null);
   
-      console.log('Pacients after clear:', cleanedData);
       return cleanedData;
     });
   };
 
-  const sortPacients = (data) => {
-    return data
+  const sortPacients = (data) => { //Função 'sortPacients', que ordena os chamados em ordem de prioridade e de timestamp
+    return data //Retorna dados ordenados
       .filter(item => item !== null) //Remove dados nulos
       .sort((a, b) => {
         if(a.priority !== b.priority){
@@ -81,33 +87,29 @@ export default function CallScreen() {
       });
   };
 
-  const sendDataToEsp32 = async(pacient, lampIP) => {
+  const sendDataToEsp32 = async(pacient, lampIP) => { //Função 'sendDataToEsp32', que envia dados do aplicativo para o esp32
     try {
-      await axios.post("http://192.168.0.225:3000/sendOff", { pacient, lampIP }, {
-        headers: { 'Content-Type': 'application/json' }
+      await axios.post(`http://${serverIP}:${serverPort}/sendOff`, { pacient, lampIP }, { //Envia requisição para desativar o chamado de 'pacient' no esp32 de 'lampIP' ao servidor
+        headers: { 'Content-Type': 'application/json' } //Adiciona header
       });
-      console.log(`Pacient ${pacient} Off.`);
-    } catch (error) {
-      console.log("Error: ", error);
+    }
+    catch(error) {
+      console.log("Error: ", error); //Informa que houve erro
     }  
   };
 
   useEffect(() => {
-    FetchDataFromEsp32();
-    const interval = setInterval(FetchDataFromEsp32, 1000);
+    const interval = setInterval(FetchDataFromEsp32, 1000); //Busca informações no servidor a cada 1s
     return () => clearInterval(interval);
   }, [pacientsData]);
-  
-  const sortedPacients = sortPacients(pacientsData);
 
   return(
     <ScrollView>
       <View style = {styles.container}>
-        {sortedPacients.map((data, index) => (
+        {sortedPacients.map((data, index) => ( //Ordena chamados
           <View 
             key = {index} 
             style = {styles.callContainer}>
-            {console.log('Rendering Pacient:', data)}
             <View style = {styles.pacientContainer}>
               <Text style = {styles.pacientTextStyle}>Paciente {data.pacient}</Text>
               <View style = {styles.infoContainer}>
@@ -119,7 +121,7 @@ export default function CallScreen() {
                     <Button
                       title = "OK"
                       color = "midnightblue"
-                      onPress = {() => ClearPacient(index, data.pacient,data.lampIP)}
+                      onPress = {() => ClearPacient(index, data.pacient,data.lampIP)} //Remove o chamado ativo ao pressionar o botão
                     />
                   </>
                 )}
@@ -147,47 +149,50 @@ export default function CallScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { //Container da tela
     flex: 1,
     paddingHorizontal: 20,
     justifyContent: "flex-start",
     alignItems: "center",
-    backgroundColor: "#eaeaea",
+    backgroundColor: "#eaeaea"
   },
-  callContainer: {
+  callContainer: { //Container do chamado
     width: "100%",
     marginVertical: 10,
     padding: 10,
     backgroundColor: "#fff",
     borderRadius: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { 
+      width: 0, 
+      height: 2 
+    },
     shadowOpacity: 0.3,
     shadowRadius: 3,
-    position: "relative", // Necessário para posicionar o LED
+    position: "relative"
   },
-  pacientContainer: {
+  pacientContainer: { //Container do paciente
     width: "100%", 
     justifyContent: "flex-start",
-    alignItems: "flex-start", 
+    alignItems: "flex-start" 
   },
-  infoContainer: {
-    marginTop: 10, 
+  infoContainer: { //container das informações do chamado
+    marginTop: 10
   },
   pacientTextStyle: {
     fontSize: 18,
     fontWeight: "bold",
-    textAlign: "left",
+    textAlign: "left"
   },
-  ledContainer: {
+  ledContainer: { //Container do Led
     position: "absolute",
     top: 10, 
-    right: 10, // Posiciona o LED no canto superior direito
+    right: 10
   },
-  activeLed: {
-    width: 30, // Aumentando o tamanho do LED
+  activeLed: { //Led ATIVO
+    width: 30,
     height: 30,
-    borderRadius: 15,
+    borderRadius: 15
   },
   greenLed: {
     backgroundColor: "#008000" //Verde para prioridade 1
@@ -198,14 +203,14 @@ const styles = StyleSheet.create({
   redLed: {
     backgroundColor: "#ff0000" //Vermelhor para prioridade 3
   },
-  inactiveLed: {
-    width: 30, // Aumentando o tamanho do LED
+  inactiveLed: { //Led INATIVO
+    width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#ccc',
+    backgroundColor: '#ccc'
   },
   callInfoText: {
     fontSize: 15,
-    textAlign: "left",
+    textAlign: "left"
   }
 });
